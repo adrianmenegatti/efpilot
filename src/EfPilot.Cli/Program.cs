@@ -1,4 +1,6 @@
 ﻿using EfPilot.Core.Configuration;
+using EfPilot.Core.Profiles;
+using EfPilot.Core.Workspace;
 using EfPilot.Workspace.Configuration;
 using EfPilot.Workspace.Discovery;
 using Spectre.Console;
@@ -87,31 +89,93 @@ static async Task<int> RunInitAsync()
         }
     }
 
-    // 4. Manual config (MVP)
-    AnsiConsole.WriteLine();
-    AnsiConsole.MarkupLine("[bold]Manual configuration[/]");
+    // 4. Create profiles
+    var profiles = new List<EfPilotProfile>();
 
-    var profileName = AnsiConsole.Ask<string>("Profile name:");
-    var dbContextName = AnsiConsole.Ask<string>("DbContext name:");
-    var project = AnsiConsole.Ask<string>("Project path:");
-    var startupProject = AnsiConsole.Ask<string>("Startup project path:");
-    var migrationsFolder = AnsiConsole.Ask<string?>("Migrations folder (optional):");
-
-    var profile = new EfPilotProfile
+    if (dbContexts.Count > 0)
     {
-        Name = profileName,
-        DbContext = dbContextName,
-        Project = project,
-        StartupProject = startupProject,
-        MigrationsFolder = string.IsNullOrWhiteSpace(migrationsFolder)
-            ? null
-            : migrationsFolder
-    };
+        var createDetectedProfiles = AnsiConsole.Confirm(
+            "Create profiles from detected DbContexts?",
+            defaultValue: true);
 
+        if (createDetectedProfiles)
+        {
+            var startupDetector = new StartupProjectDetector();
+
+            foreach (var dbContext in dbContexts)
+            {
+                var candidates = startupDetector
+                    .DetectCandidates(dbContext, projects)
+                    .ToList();
+
+                if (candidates.Count == 0)
+                {
+                    AnsiConsole.MarkupLine(
+                        $"[yellow]No startup project candidates found for {dbContext.Name}. Skipping.[/]");
+                    continue;
+                }
+
+                var selectedCandidate = candidates.Count == 1
+                    ? candidates[0]
+                    : AnsiConsole.Prompt(
+                        new SelectionPrompt<StartupProjectCandidate>()
+                            .Title($"Select startup project for [green]{dbContext.Name}[/]:")
+                            .PageSize(10)
+                            .UseConverter(candidate =>
+                                $"{candidate.Project.Name} (score: {candidate.Score})")
+                            .AddChoices(candidates));
+
+                var profileNameSuggestion = ProfileNameGenerator.FromDbContext(dbContext.Name);
+
+                var profileName = AnsiConsole.Ask(
+                    $"Profile name for [green]{dbContext.Name}[/]:",
+                    profileNameSuggestion);
+                
+                var migrationsFolder = AnsiConsole.Ask<string?>(
+                    $"Migrations folder for [green]{dbContext.Name}[/] (optional):",
+                    null);
+
+                profiles.Add(new EfPilotProfile
+                {
+                    Name = profileName,
+                    DbContext = dbContext.Name,
+                    Project = ToRelativePath(solutionDirectory, dbContext.Project.Path),
+                    StartupProject = ToRelativePath(solutionDirectory, selectedCandidate.Project.Path),
+                    MigrationsFolder = string.IsNullOrWhiteSpace(migrationsFolder)
+                        ? null
+                        : migrationsFolder
+                });
+            }
+        }
+    }
+
+    if (profiles.Count == 0)
+    {
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine("[bold]Manual configuration[/]");
+
+        var profileName = AnsiConsole.Ask<string>("Profile name:");
+        var dbContextName = AnsiConsole.Ask<string>("DbContext name:");
+        var project = AnsiConsole.Ask<string>("Project path:");
+        var startupProject = AnsiConsole.Ask<string>("Startup project path:");
+        var migrationsFolder = AnsiConsole.Ask<string?>("Migrations folder (optional):");
+
+        profiles.Add(new EfPilotProfile
+        {
+            Name = profileName,
+            DbContext = dbContextName,
+            Project = project,
+            StartupProject = startupProject,
+            MigrationsFolder = string.IsNullOrWhiteSpace(migrationsFolder)
+                ? null
+                : migrationsFolder
+        });
+    }
+    
     var config = new EfPilotConfig
     {
         Solution = solutionFileName,
-        Profiles = [profile]
+        Profiles = profiles
     };
 
     // 5. Save config
@@ -125,4 +189,9 @@ static async Task<int> RunInitAsync()
     AnsiConsole.MarkupLine($"Config saved to: [blue]{configPath}[/]");
 
     return 0;
+}
+
+static string ToRelativePath(string baseDirectory, string fullPath)
+{
+    return Path.GetRelativePath(baseDirectory, fullPath);
 }
