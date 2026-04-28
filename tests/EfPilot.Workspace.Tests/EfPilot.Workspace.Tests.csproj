@@ -18,4 +18,9 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\EfPilot.Core\EfPilot.Core.csproj" />
+    <ProjectReference Include="..\..\src\EfPilot.Workspace\EfPilot.Workspace.csproj" />
+  </ItemGroup>
+
 </Project>
