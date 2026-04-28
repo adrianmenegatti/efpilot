@@ -200,6 +200,33 @@ public sealed class DotNetEfMigrationCommandRunner : IMigrationCommandRunner
             arguments,
             cancellationToken);
     }
+    
+    public async Task<MigrationCommandResult> GetStatusAsync(
+        MigrationStatusRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var profile = request.Profile;
+
+        var arguments = new List<string>
+        {
+            "ef",
+            "migrations",
+            "list",
+            "--project",
+            ToFullPath(request.SolutionDirectory, profile.Project),
+            "--startup-project",
+            ToFullPath(request.SolutionDirectory, profile.StartupProject),
+            "--context",
+            profile.DbContext
+        };
+
+        return await RunDotNetAsync(
+            request.SolutionDirectory,
+            arguments,
+            cancellationToken);
+    }
 
     private static string ToFullPath(string solutionDirectory, string path)
     {

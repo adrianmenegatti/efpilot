@@ -15,4 +15,8 @@ public interface IMigrationCommandRunner
     Task<MigrationCommandResult> UpdateDatabaseAsync(
         UpdateDatabaseRequest request,
         CancellationToken cancellationToken = default);
+    
+    Task<MigrationCommandResult> GetStatusAsync(
+        MigrationStatusRequest request,
+        CancellationToken cancellationToken = default);
 }
