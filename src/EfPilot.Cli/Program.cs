@@ -1,6 +1,8 @@
 ﻿using EfPilot.Core.Configuration;
+using EfPilot.Core.Migrations;
 using EfPilot.Core.Profiles;
 using EfPilot.Core.Workspace;
+using EfPilot.EfCore.Execution;
 using EfPilot.Workspace.Configuration;
 using EfPilot.Workspace.Discovery;
 using Spectre.Console;
@@ -10,6 +12,9 @@ var rootCommand = args.FirstOrDefault();
 return rootCommand switch
 {
     "init" => await RunInitAsync(),
+    "add" => await RunAddAsync(args.Skip(1).ToArray()),
+    "remove" => await RunRemoveAsync(args.Skip(1).ToArray()),
+    "update" => await RunUpdateAsync(args.Skip(1).ToArray()),
     _ => ShowHelp()
 };
 
@@ -20,6 +25,9 @@ static int ShowHelp()
 
     AnsiConsole.MarkupLine("Usage:");
     AnsiConsole.MarkupLine("  [green]efpilot init[/]");
+    AnsiConsole.MarkupLine("  [green]efpilot add <MigrationName> --profile <ProfileName> [--verbose][/]");
+    AnsiConsole.MarkupLine("  [green]efpilot remove --profile <ProfileName> [--force] [--verbose][/]");
+    AnsiConsole.MarkupLine("  [green]efpilot update --profile <ProfileName> [--to <Migration>] [--verbose][/]");
 
     return 0;
 }
@@ -28,7 +36,6 @@ static async Task<int> RunInitAsync()
 {
     var currentDirectory = Directory.GetCurrentDirectory();
 
-    // 1. Find solution
     var solutionFinder = new SolutionFinder();
     var solutionPath = solutionFinder.FindSolutionFile(currentDirectory);
 
@@ -43,13 +50,11 @@ static async Task<int> RunInitAsync()
 
     AnsiConsole.MarkupLine($"Found solution: [green]{solutionFileName}[/]");
 
-    // 2. Scan projects
     var projectScanner = new ProjectScanner();
     var projects = projectScanner.ScanProjects(solutionDirectory);
 
     AnsiConsole.MarkupLine($"Found projects: [green]{projects.Count}[/]");
 
-    // 3. Scan DbContexts
     var dbContextScanner = new DbContextScanner();
     var dbContexts = dbContextScanner.ScanDbContexts(projects);
 
@@ -89,7 +94,6 @@ static async Task<int> RunInitAsync()
         }
     }
 
-    // 4. Create profiles
     var profiles = new List<EfPilotProfile>();
 
     if (dbContexts.Count > 0)
@@ -130,7 +134,7 @@ static async Task<int> RunInitAsync()
                 var profileName = AnsiConsole.Ask(
                     $"Profile name for [green]{dbContext.Name}[/]:",
                     profileNameSuggestion);
-                
+
                 var migrationsFolder = AnsiConsole.Ask<string?>(
                     $"Migrations folder for [green]{dbContext.Name}[/] (optional):",
                     null);
@@ -171,14 +175,13 @@ static async Task<int> RunInitAsync()
                 : migrationsFolder
         });
     }
-    
+
     var config = new EfPilotConfig
     {
         Solution = solutionFileName,
         Profiles = profiles
     };
 
-    // 5. Save config
     var store = new EfPilotConfigStore();
     await store.SaveAsync(solutionDirectory, config);
 
@@ -191,7 +194,351 @@ static async Task<int> RunInitAsync()
     return 0;
 }
 
+static async Task<int> RunAddAsync(string[] args)
+{
+    var migrationName = args.FirstOrDefault(arg => !arg.StartsWith("--", StringComparison.OrdinalIgnoreCase));
+
+    if (string.IsNullOrWhiteSpace(migrationName))
+    {
+        AnsiConsole.MarkupLine("[red]Migration name is required.[/]");
+        AnsiConsole.MarkupLine("Usage: [green]efpilot add <MigrationName> --profile <ProfileName> [--verbose][/]");
+        return 1;
+    }
+
+    var profileName = GetOptionValue(args, "--profile");
+    var verbose = HasFlag(args, "--verbose");
+
+    var context = await LoadExecutionContextAsync();
+
+    if (context is null)
+    {
+        return 1;
+    }
+
+    var profile = ResolveProfile(context.Config.Profiles, profileName);
+
+    if (profile is null)
+    {
+        PrintProfileNotFound(context.Config.Profiles);
+        return 1;
+    }
+
+    if (!ValidateProfilePaths(context.SolutionDirectory, profile))
+    {
+        return 1;
+    }
+
+    AnsiConsole.MarkupLine(
+        $"Adding migration [green]{migrationName}[/] using profile [blue]{profile.Name}[/]");
+
+    var runner = new DotNetEfMigrationCommandRunner();
+
+    var result = await runner.AddMigrationAsync(new AddMigrationRequest
+    {
+        SolutionDirectory = context.SolutionDirectory,
+        Profile = profile,
+        MigrationName = migrationName
+    });
+
+    if (verbose)
+    {
+        PrintCommandOutput(result.StandardOutput, result.StandardError);
+    }
+
+    if (!result.Success)
+    {
+        AnsiConsole.MarkupLine($"[red]✖ Migration failed. Exit code: {result.ExitCode}[/]");
+
+        if (!verbose)
+        {
+            PrintCommandOutput(result.StandardOutput, result.StandardError);
+        }
+
+        return result.ExitCode;
+    }
+
+    AnsiConsole.MarkupLine($"[green]✔ Migration '{migrationName}' created successfully.[/]");
+    return 0;
+}
+
+static async Task<int> RunRemoveAsync(string[] args)
+{
+    var profileName = GetOptionValue(args, "--profile");
+    var verbose = HasFlag(args, "--verbose");
+    var force = HasFlag(args, "--force");
+
+    var context = await LoadExecutionContextAsync();
+
+    if (context is null)
+    {
+        return 1;
+    }
+
+    var profile = ResolveProfile(context.Config.Profiles, profileName);
+
+    if (profile is null)
+    {
+        PrintProfileNotFound(context.Config.Profiles);
+        return 1;
+    }
+
+    if (!ValidateProfilePaths(context.SolutionDirectory, profile))
+    {
+        return 1;
+    }
+
+    AnsiConsole.MarkupLine(
+        $"Removing last migration using profile [blue]{profile.Name}[/]");
+
+    if (force)
+    {
+        AnsiConsole.MarkupLine("[yellow]Force mode enabled.[/]");
+    }
+
+    var confirmed = AnsiConsole.Confirm(
+        "This will remove the last migration. Continue?",
+        defaultValue: false);
+
+    if (!confirmed)
+    {
+        AnsiConsole.MarkupLine("[yellow]Operation cancelled.[/]");
+        return 0;
+    }
+
+    var runner = new DotNetEfMigrationCommandRunner();
+
+    var result = await runner.RemoveMigrationAsync(new RemoveMigrationRequest
+    {
+        SolutionDirectory = context.SolutionDirectory,
+        Profile = profile,
+        Force = force
+    });
+
+    if (verbose)
+    {
+        PrintCommandOutput(result.StandardOutput, result.StandardError);
+    }
+
+    if (!result.Success)
+    {
+        AnsiConsole.MarkupLine($"[red]✖ Remove migration failed. Exit code: {result.ExitCode}[/]");
+
+        if (!verbose)
+        {
+            PrintCommandOutput(result.StandardOutput, result.StandardError);
+        }
+
+        return result.ExitCode;
+    }
+
+    AnsiConsole.MarkupLine("[green]✔ Last migration removed successfully.[/]");
+    return 0;
+}
+
+static async Task<int> RunUpdateAsync(string[] args)
+{
+    var profileName = GetOptionValue(args, "--profile");
+    var verbose = HasFlag(args, "--verbose");
+    var targetMigration = GetOptionValue(args, "--to");
+
+    var context = await LoadExecutionContextAsync();
+
+    if (context is null)
+    {
+        return 1;
+    }
+
+    var profile = ResolveProfile(context.Config.Profiles, profileName);
+
+    if (profile is null)
+    {
+        PrintProfileNotFound(context.Config.Profiles);
+        return 1;
+    }
+
+    if (!ValidateProfilePaths(context.SolutionDirectory, profile))
+    {
+        return 1;
+    }
+
+    if (string.IsNullOrWhiteSpace(targetMigration))
+    {
+        AnsiConsole.MarkupLine(
+            $"Updating database using profile [blue]{profile.Name}[/]");
+    }
+    else
+    {
+        AnsiConsole.MarkupLine(
+            $"Updating database to migration [green]{targetMigration}[/] using profile [blue]{profile.Name}[/]");
+    }
+
+    var runner = new DotNetEfMigrationCommandRunner();
+
+    var result = await runner.UpdateDatabaseAsync(new UpdateDatabaseRequest
+    {
+        SolutionDirectory = context.SolutionDirectory,
+        Profile = profile,
+        TargetMigration = targetMigration
+    });
+
+    if (verbose)
+    {
+        PrintCommandOutput(result.StandardOutput, result.StandardError);
+    }
+
+    if (!result.Success)
+    {
+        AnsiConsole.MarkupLine($"[red]✖ Database update failed. Exit code: {result.ExitCode}[/]");
+
+        if (!verbose)
+        {
+            PrintCommandOutput(result.StandardOutput, result.StandardError);
+        }
+
+        return result.ExitCode;
+    }
+
+    AnsiConsole.MarkupLine("[green]✔ Database updated successfully.[/]");
+    return 0;
+}
+
+static async Task<ExecutionContextData?> LoadExecutionContextAsync()
+{
+    var currentDirectory = Directory.GetCurrentDirectory();
+
+    var solutionFinder = new SolutionFinder();
+    var solutionPath = solutionFinder.FindSolutionFile(currentDirectory);
+
+    if (solutionPath is null)
+    {
+        AnsiConsole.MarkupLine("[red]No .sln or .slnx file found.[/]");
+        return null;
+    }
+
+    var solutionDirectory = Path.GetDirectoryName(solutionPath)!;
+
+    var store = new EfPilotConfigStore();
+    var config = await store.LoadAsync(solutionDirectory);
+
+    if (config is null)
+    {
+        AnsiConsole.MarkupLine("[red]efpilot is not initialized for this solution.[/]");
+        AnsiConsole.MarkupLine("Run [green]efpilot init[/] first.");
+        return null;
+    }
+
+    return new ExecutionContextData(solutionDirectory, config);
+}
+
+static bool ValidateProfilePaths(string solutionDirectory, EfPilotProfile profile)
+{
+    var projectPath = ToFullPath(solutionDirectory, profile.Project);
+    var startupProjectPath = ToFullPath(solutionDirectory, profile.StartupProject);
+
+    var isValid = true;
+
+    if (!File.Exists(projectPath))
+    {
+        AnsiConsole.MarkupLine($"[red]Project file not found:[/] {projectPath}");
+        isValid = false;
+    }
+
+    if (!File.Exists(startupProjectPath))
+    {
+        AnsiConsole.MarkupLine($"[red]Startup project file not found:[/] {startupProjectPath}");
+        isValid = false;
+    }
+
+    return isValid;
+}
+
+static void PrintCommandOutput(string standardOutput, string standardError)
+{
+    if (!string.IsNullOrWhiteSpace(standardOutput))
+    {
+        AnsiConsole.WriteLine(standardOutput);
+    }
+
+    if (!string.IsNullOrWhiteSpace(standardError))
+    {
+        AnsiConsole.MarkupLine("[yellow]stderr:[/]");
+        AnsiConsole.WriteLine(standardError);
+    }
+}
+
+static string? GetOptionValue(string[] args, string optionName)
+{
+    for (var i = 0; i < args.Length; i++)
+    {
+        if (!string.Equals(args[i], optionName, StringComparison.OrdinalIgnoreCase))
+        {
+            continue;
+        }
+
+        return i + 1 < args.Length
+            ? args[i + 1]
+            : null;
+    }
+
+    return null;
+}
+
+static bool HasFlag(string[] args, string flagName)
+{
+    return args.Any(arg => string.Equals(arg, flagName, StringComparison.OrdinalIgnoreCase));
+}
+
+static EfPilotProfile? ResolveProfile(
+    IReadOnlyList<EfPilotProfile> profiles,
+    string? profileName)
+{
+    if (!string.IsNullOrWhiteSpace(profileName))
+    {
+        return profiles.FirstOrDefault(profile =>
+            string.Equals(profile.Name, profileName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    return profiles.Count switch
+    {
+        1 => profiles[0],
+        _ => AnsiConsole.Prompt(
+            new SelectionPrompt<EfPilotProfile>()
+                .Title("Select profile:")
+                .PageSize(10)
+                .UseConverter(profile => profile.Name)
+                .AddChoices(profiles))
+    };
+}
+
+static void PrintProfileNotFound(IReadOnlyList<EfPilotProfile> profiles)
+{
+    AnsiConsole.MarkupLine("[red]Profile not found.[/]");
+
+    if (profiles.Count == 0)
+    {
+        return;
+    }
+
+    AnsiConsole.MarkupLine("Available profiles:");
+
+    foreach (var profile in profiles)
+    {
+        AnsiConsole.MarkupLine($"- [green]{profile.Name}[/]");
+    }
+}
+
 static string ToRelativePath(string baseDirectory, string fullPath)
 {
     return Path.GetRelativePath(baseDirectory, fullPath);
 }
+
+static string ToFullPath(string solutionDirectory, string path)
+{
+    return Path.IsPathRooted(path)
+        ? path
+        : Path.GetFullPath(Path.Combine(solutionDirectory, path));
+}
+
+internal sealed record ExecutionContextData(
+    string SolutionDirectory,
+    EfPilotConfig Config);
