@@ -10,6 +10,7 @@ public sealed class StatusCommand(IMigrationCommandRunner runner) : MigrationCom
     {
         var profileName = CommandHelpers.GetOptionValue(args, "--profile");
         var verbose = CommandHelpers.HasFlag(args, "--verbose");
+        var all = CommandHelpers.HasFlag(args, "--all");
 
         var context = await CommandHelpers.LoadContextAsync();
 
@@ -18,95 +19,143 @@ public sealed class StatusCommand(IMigrationCommandRunner runner) : MigrationCom
             return 1;
         }
 
-        var profile = CommandHelpers.ResolveProfile(context.Config.Profiles, profileName);
+        var selectedProfiles = new List<EfPilot.Core.Configuration.EfPilotProfile>();
 
-        if (profile is null)
+        if (all)
         {
-            CommandHelpers.PrintProfileNotFound(context.Config.Profiles);
-            return 1;
+            selectedProfiles.AddRange(context.Config.Profiles);
+        }
+        else
+        {
+            var profile = CommandHelpers.ResolveProfile(context.Config.Profiles, profileName);
+
+            if (profile is null)
+            {
+                CommandHelpers.PrintProfileNotFound(context.Config.Profiles);
+                return 1;
+            }
+
+            selectedProfiles.Add(profile);
         }
 
-        if (!CommandHelpers.ValidateProfilePaths(context.SolutionDirectory, profile))
+        foreach (var profile in selectedProfiles)
         {
-            return 1;
-        }
+            if (!CommandHelpers.ValidateProfilePaths(context.SolutionDirectory, profile))
+            {
+                return 1;
+            }
 
-        AnsiConsole.MarkupLine("[bold]efpilot status[/]");
-        AnsiConsole.WriteLine();
+            AnsiConsole.Write(new Rule($"[bold blue]{profile.Name}[/]").RuleStyle("grey"));
 
-        AnsiConsole.MarkupLine($"Profile: [blue]{profile.Name}[/]");
-        AnsiConsole.MarkupLine($"DbContext: [green]{profile.DbContext}[/]");
-        AnsiConsole.MarkupLine($"Project: [grey]{profile.Project}[/]");
-        AnsiConsole.MarkupLine($"Startup: [grey]{profile.StartupProject}[/]");
+            AnsiConsole.MarkupLine($"DbContext: [green]{profile.DbContext}[/]");
+            AnsiConsole.MarkupLine($"Project: [grey]{profile.Project}[/]");
+            AnsiConsole.MarkupLine($"Startup: [grey]{profile.StartupProject}[/]");
 
-        if (!string.IsNullOrWhiteSpace(profile.MigrationsFolder))
-        {
-            AnsiConsole.MarkupLine($"Migrations folder: [grey]{profile.MigrationsFolder}[/]");
-        }
+            if (!string.IsNullOrWhiteSpace(profile.MigrationsFolder))
+            {
+                AnsiConsole.MarkupLine($"Migrations folder: [grey]{profile.MigrationsFolder}[/]");
+            }
 
-        AnsiConsole.WriteLine();
+            AnsiConsole.WriteLine();
 
-        var result = await Runner.GetStatusAsync(new MigrationStatusRequest
-        {
-            SolutionDirectory = context.SolutionDirectory,
-            Profile = profile
-        });
+            var result = await Runner.GetStatusAsync(new MigrationStatusRequest
+            {
+                SolutionDirectory = context.SolutionDirectory,
+                Profile = profile
+            });
 
-        if (verbose)
-        {
-            CommandHelpers.PrintCommandOutput(result.StandardOutput, result.StandardError);
-        }
-
-        if (!result.Success)
-        {
-            AnsiConsole.MarkupLine($"[red]✖ Could not read migration status. Exit code: {result.ExitCode}[/]");
-
-            if (!verbose)
+            if (verbose)
             {
                 CommandHelpers.PrintCommandOutput(result.StandardOutput, result.StandardError);
             }
 
-            return result.ExitCode;
-        }
+            if (!result.Success)
+            {
+                AnsiConsole.MarkupLine($"[red]✖ Could not read migration status. Exit code: {result.ExitCode}[/]");
 
-        PrintMigrationStatus(result.StandardOutput);
+                if (!verbose)
+                {
+                    CommandHelpers.PrintCommandOutput(result.StandardOutput, result.StandardError);
+                }
+
+                return result.ExitCode;
+            }
+
+            PrintMigrationStatus(result.StandardOutput);
+            AnsiConsole.WriteLine();
+        }
 
         return 0;
     }
 
-    private static void PrintMigrationStatus(string standardOutput)
+private static void PrintMigrationStatus(string standardOutput)
+{
+    var migrations = standardOutput
+        .Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Where(IsMigrationLine)
+        .Select(ParseMigrationLine)
+        .ToList();
+
+    if (migrations.Count == 0)
     {
-        var lines = standardOutput
-            .Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Where(line => !line.StartsWith("Build started", StringComparison.OrdinalIgnoreCase))
-            .Where(line => !line.StartsWith("Build succeeded", StringComparison.OrdinalIgnoreCase))
-            .Where(line => !line.StartsWith("Done.", StringComparison.OrdinalIgnoreCase))
-            .ToList();
-
-        if (lines.Count == 0)
-        {
-            AnsiConsole.MarkupLine("[yellow]No migrations found.[/]");
-            return;
-        }
-
-        var table = new Table()
-            .Border(TableBorder.Rounded)
-            .AddColumn("Migration")
-            .AddColumn("Status");
-
-        foreach (var line in lines)
-        {
-            var isPending = line.Contains("Pending", StringComparison.OrdinalIgnoreCase);
-
-            var cleanLine = line
-                .Replace("(Pending)", "", StringComparison.OrdinalIgnoreCase)
-                .Trim();
-
-            table.AddRow(
-                Markup.Escape(cleanLine),
-                isPending ? "[yellow]Pending[/]" : "[green]Applied[/]");
-        }
-
-        AnsiConsole.Write(table);
+        AnsiConsole.MarkupLine("[yellow]No migrations found.[/]");
+        return;
     }
+
+    var appliedCount = migrations.Count(migration => !migration.IsPending);
+    var pendingCount = migrations.Count(migration => migration.IsPending);
+
+    AnsiConsole.MarkupLine(
+        $"Migrations: [green]{appliedCount} applied[/], [yellow]{pendingCount} pending[/]");
+
+    AnsiConsole.WriteLine();
+
+    var table = new Table()
+        .Border(TableBorder.Rounded)
+        .AddColumn("Migration")
+        .AddColumn("Status");
+
+    foreach (var migration in migrations)
+    {
+        table.AddRow(
+            Markup.Escape(migration.Name),
+            migration.IsPending ? "[yellow]Pending[/]" : "[green]Applied[/]");
+    }
+
+    AnsiConsole.Write(table);
+}
+
+    private static bool IsMigrationLine(string line)
+    {
+        if (string.IsNullOrWhiteSpace(line))
+        {
+            return false;
+        }
+
+        if (line.StartsWith("Build started", StringComparison.OrdinalIgnoreCase) ||
+            line.StartsWith("Build succeeded", StringComparison.OrdinalIgnoreCase) ||
+            line.StartsWith("Done.", StringComparison.OrdinalIgnoreCase) ||
+            line.StartsWith("The Entity Framework tools version", StringComparison.OrdinalIgnoreCase) ||
+            line.StartsWith("fixes. See", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return line.Length >= 15 &&
+               char.IsDigit(line[0]) &&
+               line.Contains('_');
+    }
+
+    private static MigrationStatusLine ParseMigrationLine(string line)
+    {
+        var isPending = line.Contains("Pending", StringComparison.OrdinalIgnoreCase);
+
+        var name = line
+            .Replace("(Pending)", "", StringComparison.OrdinalIgnoreCase)
+            .Trim();
+
+        return new MigrationStatusLine(name, isPending);
+    }
+
+    private sealed record MigrationStatusLine(string Name, bool IsPending);
 }

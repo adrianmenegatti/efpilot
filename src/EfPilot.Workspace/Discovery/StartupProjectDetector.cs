@@ -11,77 +11,122 @@ public sealed class StartupProjectDetector
         ArgumentNullException.ThrowIfNull(dbContext);
         ArgumentNullException.ThrowIfNull(projects);
 
-        return projects
+        var candidates = projects
+            .Where(project => !IsSameProject(project, dbContext.Project))
             .Where(LooksLikeExecutableProject)
             .Select(project => ScoreProject(project, dbContext))
             .Where(candidate => candidate.Score > 0)
-            .Where(candidate => IsSameContextOrNoBetterOption(candidate, dbContext))
             .OrderByDescending(candidate => candidate.Score)
             .ThenBy(candidate => candidate.Project.Name)
             .ToList();
+
+        var sameBoundedContextCandidates = candidates
+            .Where(candidate => HasSameBoundedContext(candidate.Project, dbContext.Project))
+            .ToList();
+
+        return sameBoundedContextCandidates.Count > 0
+            ? sameBoundedContextCandidates
+            : candidates;
     }
 
     private static StartupProjectCandidate ScoreProject(
         WorkspaceProject project,
         DiscoveredDbContext dbContext)
     {
-        var score = 0;
-        var reasons = new List<string>();
+        var score = new CandidateScore();
 
         if (project.IsWebProject)
         {
-            score += 40;
-            reasons.Add("Web SDK project");
+            score.Add(50, "Web SDK project");
         }
 
         if (project.HasProgramCs)
         {
-            score += 20;
-            reasons.Add("Contains Program.cs");
+            score.Add(25, "Contains Program.cs");
         }
 
         if (project.HasAppSettings)
         {
-            score += 10;
-            reasons.Add("Contains appsettings.json");
+            score.Add(15, "Contains appsettings.json");
         }
 
-        if (project.Name.Contains("Api", StringComparison.OrdinalIgnoreCase))
+        if (LooksLikeApiProject(project))
         {
-            score += 20;
-            reasons.Add("Project name contains Api");
+            score.Add(30, "Looks like API project");
         }
 
-        if (project.Name.Contains("Web", StringComparison.OrdinalIgnoreCase))
+        if (LooksLikeWorkerOrHostProject(project))
         {
-            score += 10;
-            reasons.Add("Project name contains Web");
+            score.Add(15, "Looks like worker/host project");
         }
 
         if (ReferencesProject(project, dbContext.Project))
         {
-            score += 60;
-            reasons.Add($"References {dbContext.Project.Name}");
+            score.Add(80, $"References {dbContext.Project.Name}");
         }
 
-        if (IsNearInDirectoryTree(project, dbContext.Project))
+        if (HasSameBoundedContext(project, dbContext.Project))
         {
-            score += 15;
-            reasons.Add("Near DbContext project in directory tree");
+            score.Add(80, "Same bounded context");
         }
-        
-        if (LooksLikeSameBoundedContext(project, dbContext.Project))
+
+        var distanceScore = CalculateDirectoryProximityScore(project, dbContext.Project);
+
+        if (distanceScore > 0)
         {
-            score += 80;
-            reasons.Add("Same bounded context");
+            score.Add(distanceScore, "Near DbContext project in directory tree");
         }
 
         return new StartupProjectCandidate
         {
             Project = project,
-            Score = score,
-            Reasons = reasons
+            Score = score.Total,
+            Reasons = score.Reasons
         };
+    }
+
+    private static bool LooksLikeExecutableProject(WorkspaceProject project)
+    {
+        if (LooksLikeLibraryLayer(project))
+        {
+            return false;
+        }
+
+        return project.IsWebProject ||
+               project.HasProgramCs ||
+               LooksLikeApiProject(project) ||
+               LooksLikeWorkerOrHostProject(project);
+    }
+
+    private static bool LooksLikeLibraryLayer(WorkspaceProject project)
+    {
+        return project.Name.EndsWith(".Domain", StringComparison.OrdinalIgnoreCase) ||
+               project.Name.EndsWith(".Application", StringComparison.OrdinalIgnoreCase) ||
+               project.Name.EndsWith(".Infrastructure", StringComparison.OrdinalIgnoreCase) ||
+               project.Name.EndsWith(".Persistence", StringComparison.OrdinalIgnoreCase) ||
+               project.Name.EndsWith(".Data", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool LooksLikeApiProject(WorkspaceProject project)
+    {
+        return ContainsProjectToken(project.Name, "Api") ||
+               ContainsProjectToken(project.Name, "Web");
+    }
+
+    private static bool LooksLikeWorkerOrHostProject(WorkspaceProject project)
+    {
+        return ContainsProjectToken(project.Name, "Worker") ||
+               ContainsProjectToken(project.Name, "Host") ||
+               ContainsProjectToken(project.Name, "Service");
+    }
+
+    private static bool ContainsProjectToken(string projectName, string token)
+    {
+        var parts = projectName
+            .Split(['.', '-', '_'], StringSplitOptions.RemoveEmptyEntries);
+
+        return parts.Any(part =>
+            string.Equals(part, token, StringComparison.OrdinalIgnoreCase));
     }
 
     private static bool ReferencesProject(
@@ -95,19 +140,127 @@ public sealed class StartupProjectDetector
                 StringComparison.OrdinalIgnoreCase));
     }
 
-    private static bool IsNearInDirectoryTree(
+    private static bool HasSameBoundedContext(
+        WorkspaceProject project,
+        WorkspaceProject dbContextProject)
+    {
+        var projectContext = InferBoundedContext(project);
+        var dbContextProjectContext = InferBoundedContext(dbContextProject);
+
+        return !string.IsNullOrWhiteSpace(projectContext) &&
+               !string.IsNullOrWhiteSpace(dbContextProjectContext) &&
+               string.Equals(projectContext, dbContextProjectContext, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string? InferBoundedContext(WorkspaceProject project)
+    {
+        var parts = SplitPath(project.Directory);
+
+        var appsIndex = IndexOf(parts, "apps");
+
+        if (appsIndex >= 0 && appsIndex + 1 < parts.Count)
+        {
+            return parts[appsIndex + 1];
+        }
+
+        var srcIndex = IndexOf(parts, "src");
+
+        if (srcIndex >= 0 && srcIndex + 1 < parts.Count)
+        {
+            var next = parts[srcIndex + 1];
+
+            if (!LooksLikeTechnicalLayerName(next))
+            {
+                return next;
+            }
+        }
+
+        return ExtractNamePrefix(project.Name);
+    }
+
+    private static string? ExtractNamePrefix(string projectName)
+    {
+        var parts = projectName
+            .Split(['.', '-', '_'], StringSplitOptions.RemoveEmptyEntries)
+            .ToList();
+
+        if (parts.Count <= 1)
+        {
+            return null;
+        }
+
+        var first = parts[0];
+
+        return LooksLikeTechnicalLayerName(first)
+            ? null
+            : first;
+    }
+
+    private static bool LooksLikeTechnicalLayerName(string value)
+    {
+        return value.Equals("api", StringComparison.OrdinalIgnoreCase) ||
+               value.Equals("web", StringComparison.OrdinalIgnoreCase) ||
+               value.Equals("worker", StringComparison.OrdinalIgnoreCase) ||
+               value.Equals("host", StringComparison.OrdinalIgnoreCase) ||
+               value.Equals("service", StringComparison.OrdinalIgnoreCase) ||
+               value.Equals("services", StringComparison.OrdinalIgnoreCase) ||
+               value.Equals("domain", StringComparison.OrdinalIgnoreCase) ||
+               value.Equals("application", StringComparison.OrdinalIgnoreCase) ||
+               value.Equals("infrastructure", StringComparison.OrdinalIgnoreCase) ||
+               value.Equals("persistence", StringComparison.OrdinalIgnoreCase) ||
+               value.Equals("data", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static int CalculateDirectoryProximityScore(
         WorkspaceProject project,
         WorkspaceProject dbContextProject)
     {
         var projectParts = SplitPath(project.Directory);
         var dbContextParts = SplitPath(dbContextProject.Directory);
 
-        var common = projectParts
+        var commonPrefixLength = projectParts
             .Zip(dbContextParts)
             .TakeWhile(pair => string.Equals(pair.First, pair.Second, StringComparison.OrdinalIgnoreCase))
             .Count();
 
-        return common >= Math.Min(projectParts.Count, dbContextParts.Count) - 2;
+        if (commonPrefixLength == 0)
+        {
+            return 0;
+        }
+
+        var maxDepth = Math.Max(projectParts.Count, dbContextParts.Count);
+        var proximity = (double)commonPrefixLength / maxDepth;
+
+        return proximity switch
+        {
+            >= 0.8 => 30,
+            >= 0.6 => 20,
+            >= 0.4 => 10,
+            _ => 0
+        };
+    }
+
+    private static bool IsSameProject(
+        WorkspaceProject project,
+        WorkspaceProject otherProject)
+    {
+        return string.Equals(
+            Path.GetFullPath(project.Path),
+            Path.GetFullPath(otherProject.Path),
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static int IndexOf(IReadOnlyList<string> parts, string value)
+    {
+        for (var i = 0; i < parts.Count; i++)
+        {
+            if (string.Equals(parts[i], value, StringComparison.OrdinalIgnoreCase))
+            {
+                return i;
+            }
+        }
+
+        return -1;
     }
 
     private static IReadOnlyList<string> SplitPath(string path)
@@ -118,36 +271,17 @@ public sealed class StartupProjectDetector
             .Where(part => !string.IsNullOrWhiteSpace(part))
             .ToList();
     }
-    
-    private static bool LooksLikeSameBoundedContext(
-        WorkspaceProject project,
-        WorkspaceProject dbContextProject)
-    {
-        var projectParts = SplitPath(project.Directory);
-        var dbContextParts = SplitPath(dbContextProject.Directory);
 
-        return projectParts.Intersect(
-                dbContextParts,
-                StringComparer.OrdinalIgnoreCase)
-            .Any(part =>
-                part.Equals("identity", StringComparison.OrdinalIgnoreCase) ||
-                part.Equals("raterisk", StringComparison.OrdinalIgnoreCase));
-    }
-    
-    private static bool LooksLikeExecutableProject(WorkspaceProject project)
+    private sealed class CandidateScore
     {
-        return project.IsWebProject ||
-               project.HasProgramCs ||
-               project.Name.Contains("Api", StringComparison.OrdinalIgnoreCase) ||
-               project.Name.Contains("Worker", StringComparison.OrdinalIgnoreCase) ||
-               project.Name.Contains("Host", StringComparison.OrdinalIgnoreCase);
-    }
-    
-    private static bool IsSameContextOrNoBetterOption(
-        StartupProjectCandidate candidate,
-        DiscoveredDbContext dbContext)
-    {
-        return LooksLikeSameBoundedContext(candidate.Project, dbContext.Project) ||
-               ReferencesProject(candidate.Project, dbContext.Project);
+        public int Total { get; private set; }
+
+        public List<string> Reasons { get; } = [];
+
+        public void Add(int points, string reason)
+        {
+            Total += points;
+            Reasons.Add(reason);
+        }
     }
 }
