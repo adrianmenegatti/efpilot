@@ -13,6 +13,7 @@ services.AddTransient<AddCommand>();
 services.AddTransient<RemoveCommand>();
 services.AddTransient<UpdateCommand>();
 services.AddTransient<StatusCommand>();
+services.AddTransient<DiffCommand>();
 
 var provider = services.BuildServiceProvider();
 
@@ -25,6 +26,7 @@ return rootCommand switch
     "remove" => await provider.GetRequiredService<RemoveCommand>().ExecuteAsync(args.Skip(1).ToArray()),
     "update" => await provider.GetRequiredService<UpdateCommand>().ExecuteAsync(args.Skip(1).ToArray()),
     "status" => await provider.GetRequiredService<StatusCommand>().ExecuteAsync(args.Skip(1).ToArray()),
+    "diff" => await provider.GetRequiredService<DiffCommand>().ExecuteAsync(args.Skip(1).ToArray()),
     _ => ShowHelp()
 };
 
@@ -39,6 +41,7 @@ static int ShowHelp()
     AnsiConsole.MarkupLine("  [green]efpilot remove --profile <ProfileName> [--force] [--verbose][/]");
     AnsiConsole.MarkupLine("  [green]efpilot update --profile <ProfileName> [--to <Migration>] [--verbose][/]");
     AnsiConsole.MarkupLine("  [green]efpilot status --profile <ProfileName> [--verbose][/]");
+    AnsiConsole.MarkupLine("  [green]efpilot diff --profile <ProfileName> [--verbose][/]");
 
     return 0;
 }
