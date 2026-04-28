@@ -427,3 +427,9 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# Rider
+.idea/*
+
+# App
+.efpilot/*

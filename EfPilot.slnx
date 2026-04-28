@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/EfPilot.Cli/EfPilot.Cli.csproj" />
+    <Project Path="src/EfPilot.Core/EfPilot.Core.csproj" />
+    <Project Path="src/EfPilot.EfCore/EfPilot.EfCore.csproj" />
+    <Project Path="src/EfPilot.Workspace/EfPilot.Workspace.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/EfPilot.Core.Tests/EfPilot.Core.Tests.csproj" />
+    <Project Path="tests/EfPilot.Workspace.Tests/EfPilot.Workspace.Tests.csproj" />
+  </Folder>
+</Solution>
