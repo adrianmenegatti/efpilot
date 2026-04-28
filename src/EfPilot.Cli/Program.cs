@@ -257,9 +257,20 @@ static async Task<int> RunAddAsync(string[] args)
         return result.ExitCode;
     }
 
+    if (result.NoModelChangesDetected)
+    {
+        AnsiConsole.MarkupLine("[yellow]✔ No model changes detected. Migration skipped.[/]");
+        return 0;
+    }
+
     AnsiConsole.MarkupLine($"[green]✔ Migration '{migrationName}' created successfully.[/]");
-    return 0;
-}
+
+    if (!string.IsNullOrWhiteSpace(result.CreatedMigrationFile))
+    {
+        AnsiConsole.MarkupLine($"[grey]File: {result.CreatedMigrationFile}[/]");
+    }
+
+    return 0;}
 
 static async Task<int> RunRemoveAsync(string[] args)
 {

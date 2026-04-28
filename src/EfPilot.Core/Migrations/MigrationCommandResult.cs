@@ -10,6 +10,10 @@ public sealed class MigrationCommandResult
 
     public required string StandardError { get; init; }
 
+    public bool NoModelChangesDetected { get; init; }
+
+    public string? CreatedMigrationFile { get; init; }
+
     public static MigrationCommandResult Succeeded(
         string standardOutput,
         string standardError,
