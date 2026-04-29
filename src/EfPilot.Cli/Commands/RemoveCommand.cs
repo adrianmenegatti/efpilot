@@ -1,3 +1,4 @@
+using EfPilot.Cli.Output;
 using EfPilot.Core.Abstractions;
 using EfPilot.Core.Migrations;
 using Spectre.Console;
@@ -32,12 +33,14 @@ public sealed class RemoveCommand(IMigrationCommandRunner runner) : MigrationCom
             return 1;
         }
 
-        AnsiConsole.MarkupLine(
-            $"Removing last migration using profile [blue]{profile.Name}[/]");
-
+        ConsoleOutput.Header("EfPilot Remove");
+        ConsoleOutput.ProfileSummary(profile);
+        AnsiConsole.WriteLine();
+        ConsoleOutput.Info("Removing last migration...");
+        
         if (force)
         {
-            AnsiConsole.MarkupLine("[yellow]Force mode enabled.[/]");
+            ConsoleOutput.Warning("Force mode enabled.");
         }
 
         var confirmed = AnsiConsole.Confirm(
@@ -46,7 +49,7 @@ public sealed class RemoveCommand(IMigrationCommandRunner runner) : MigrationCom
 
         if (!confirmed)
         {
-            AnsiConsole.MarkupLine("[yellow]Operation cancelled.[/]");
+            ConsoleOutput.Warning("Operation cancelled.");
             return 0;
         }
 
@@ -64,7 +67,7 @@ public sealed class RemoveCommand(IMigrationCommandRunner runner) : MigrationCom
 
         if (!result.Success)
         {
-            AnsiConsole.MarkupLine($"[red]✖ Remove migration failed. Exit code: {result.ExitCode}[/]");
+            ConsoleOutput.Error($"Remove migration failed. Exit code: {result.ExitCode}");
 
             if (!verbose)
             {
@@ -74,7 +77,7 @@ public sealed class RemoveCommand(IMigrationCommandRunner runner) : MigrationCom
             return result.ExitCode;
         }
 
-        AnsiConsole.MarkupLine("[green]✔ Last migration removed successfully.[/]");
+        ConsoleOutput.Success("Last migration removed successfully.");
         return 0;
     }
 }

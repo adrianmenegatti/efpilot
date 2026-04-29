@@ -1,0 +1,45 @@
+using EfPilot.Core.Configuration;
+using Spectre.Console;
+
+namespace EfPilot.Cli.Output;
+
+internal static class ConsoleOutput
+{
+    public static void Header(string title)
+    {
+        AnsiConsole.Write(new Rule($"[bold blue]{Markup.Escape(title)}[/]").RuleStyle("grey"));
+    }
+
+    public static void Success(string message)
+    {
+        AnsiConsole.MarkupLine($"[green]✔ {Markup.Escape(message)}[/]");
+    }
+
+    public static void Error(string message)
+    {
+        AnsiConsole.MarkupLine($"[red]✖ {Markup.Escape(message)}[/]");
+    }
+
+    public static void Warning(string message)
+    {
+        AnsiConsole.MarkupLine($"[yellow]⚠ {Markup.Escape(message)}[/]");
+    }
+
+    public static void Info(string message)
+    {
+        AnsiConsole.MarkupLine($"[blue]ℹ {Markup.Escape(message)}[/]");
+    }
+
+    public static void ProfileSummary(EfPilotProfile profile)
+    {
+        AnsiConsole.MarkupLine($"Profile: [blue]{Markup.Escape(profile.Name)}[/]");
+        AnsiConsole.MarkupLine($"DbContext: [green]{Markup.Escape(profile.DbContext)}[/]");
+        AnsiConsole.MarkupLine($"Project: [grey]{Markup.Escape(profile.Project)}[/]");
+        AnsiConsole.MarkupLine($"Startup: [grey]{Markup.Escape(profile.StartupProject)}[/]");
+
+        if (!string.IsNullOrWhiteSpace(profile.MigrationsFolder))
+        {
+            AnsiConsole.MarkupLine($"Migrations folder: [grey]{Markup.Escape(profile.MigrationsFolder)}[/]");
+        }
+    }
+}

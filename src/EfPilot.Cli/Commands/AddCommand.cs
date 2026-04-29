@@ -1,3 +1,4 @@
+using EfPilot.Cli.Output;
 using EfPilot.Core.Abstractions;
 using EfPilot.Core.Migrations;
 using Spectre.Console;
@@ -13,7 +14,7 @@ public sealed class AddCommand(IMigrationCommandRunner runner) : MigrationComman
 
         if (string.IsNullOrWhiteSpace(migrationName))
         {
-            AnsiConsole.MarkupLine("[red]Migration name is required.[/]");
+            ConsoleOutput.Error("Migration name is required.");
             AnsiConsole.MarkupLine("Usage: [green]efpilot add <MigrationName> --profile <ProfileName> [--verbose][/]");
             return 1;
         }
@@ -41,8 +42,10 @@ public sealed class AddCommand(IMigrationCommandRunner runner) : MigrationComman
             return 1;
         }
 
-        AnsiConsole.MarkupLine(
-            $"Adding migration [green]{migrationName}[/] using profile [blue]{profile.Name}[/]");
+        ConsoleOutput.Header("EfPilot Add");
+        ConsoleOutput.ProfileSummary(profile);
+        AnsiConsole.WriteLine();
+        ConsoleOutput.Info($"Adding migration '{migrationName}'...");
 
         var result = await Runner.AddMigrationAsync(new AddMigrationRequest
         {
@@ -58,7 +61,7 @@ public sealed class AddCommand(IMigrationCommandRunner runner) : MigrationComman
 
         if (!result.Success)
         {
-            AnsiConsole.MarkupLine($"[red]✖ Migration failed. Exit code: {result.ExitCode}[/]");
+            ConsoleOutput.Error($"Migration failed. Exit code: {result.ExitCode}");
 
             if (!verbose)
             {
@@ -70,15 +73,15 @@ public sealed class AddCommand(IMigrationCommandRunner runner) : MigrationComman
 
         if (result.NoModelChangesDetected)
         {
-            AnsiConsole.MarkupLine("[yellow]✔ No model changes detected. Migration skipped.[/]");
+            ConsoleOutput.Success("No model changes detected. Migration skipped.");
             return 0;
         }
 
-        AnsiConsole.MarkupLine($"[green]✔ Migration '{migrationName}' created successfully.[/]");
+        ConsoleOutput.Success($"Migration '{migrationName}' created successfully.");
 
         if (!string.IsNullOrWhiteSpace(result.CreatedMigrationFile))
         {
-            AnsiConsole.MarkupLine($"[grey]File: {result.CreatedMigrationFile}[/]");
+            AnsiConsole.MarkupLine($"[grey]File: {Markup.Escape(result.CreatedMigrationFile)}[/]");
         }
 
         return 0;

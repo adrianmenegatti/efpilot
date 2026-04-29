@@ -1,6 +1,7 @@
 using EfPilot.Core.Abstractions;
 using EfPilot.Core.Migrations;
 using Spectre.Console;
+using EfPilot.Cli.Output;
 
 namespace EfPilot.Cli.Commands;
 
@@ -45,16 +46,8 @@ public sealed class StatusCommand(IMigrationCommandRunner runner) : MigrationCom
                 return 1;
             }
 
-            AnsiConsole.Write(new Rule($"[bold blue]{profile.Name}[/]").RuleStyle("grey"));
-
-            AnsiConsole.MarkupLine($"DbContext: [green]{profile.DbContext}[/]");
-            AnsiConsole.MarkupLine($"Project: [grey]{profile.Project}[/]");
-            AnsiConsole.MarkupLine($"Startup: [grey]{profile.StartupProject}[/]");
-
-            if (!string.IsNullOrWhiteSpace(profile.MigrationsFolder))
-            {
-                AnsiConsole.MarkupLine($"Migrations folder: [grey]{profile.MigrationsFolder}[/]");
-            }
+            ConsoleOutput.Header(profile.Name);
+            ConsoleOutput.ProfileSummary(profile);
 
             AnsiConsole.WriteLine();
 
@@ -71,7 +64,7 @@ public sealed class StatusCommand(IMigrationCommandRunner runner) : MigrationCom
 
             if (!result.Success)
             {
-                AnsiConsole.MarkupLine($"[red]✖ Could not read migration status. Exit code: {result.ExitCode}[/]");
+                ConsoleOutput.Error($"Could not read migration status. Exit code: {result.ExitCode}");
 
                 if (!verbose)
                 {
@@ -98,7 +91,7 @@ private static void PrintMigrationStatus(string standardOutput)
 
     if (migrations.Count == 0)
     {
-        AnsiConsole.MarkupLine("[yellow]No migrations found.[/]");
+        ConsoleOutput.Warning("No migrations found.");
         return;
     }
 

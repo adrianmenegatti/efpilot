@@ -1,3 +1,4 @@
+using EfPilot.Cli.Output;
 using EfPilot.Core.Abstractions;
 using EfPilot.Core.Migrations;
 using Spectre.Console;
@@ -33,8 +34,10 @@ public sealed class DiffCommand(IMigrationCommandRunner runner) : MigrationComma
 
         var tempMigrationName = $"__EfPilotDiff_{DateTime.UtcNow:yyyyMMddHHmmss}";
 
-        AnsiConsole.MarkupLine(
-            $"Checking model changes using profile [blue]{profile.Name}[/]");
+        ConsoleOutput.Header("EfPilot Diff");
+        ConsoleOutput.ProfileSummary(profile);
+        AnsiConsole.WriteLine();
+        ConsoleOutput.Info("Checking model changes...");
 
         var addResult = await Runner.AddMigrationAsync(new AddMigrationRequest
         {
@@ -50,8 +53,8 @@ public sealed class DiffCommand(IMigrationCommandRunner runner) : MigrationComma
 
         if (!addResult.Success)
         {
-            AnsiConsole.MarkupLine($"[red]✖ Could not generate temporary migration. Exit code: {addResult.ExitCode}[/]");
-
+            ConsoleOutput.Error($"Could not generate temporary migration. Exit code: {addResult.ExitCode}");
+            
             if (!verbose)
             {
                 CommandHelpers.PrintCommandOutput(addResult.StandardOutput, addResult.StandardError);
@@ -62,7 +65,7 @@ public sealed class DiffCommand(IMigrationCommandRunner runner) : MigrationComma
 
         if (addResult.NoModelChangesDetected || string.IsNullOrWhiteSpace(addResult.CreatedMigrationFile))
         {
-            AnsiConsole.MarkupLine("[green]✔ No model changes detected.[/]");
+            ConsoleOutput.Success("No model changes detected.");
             return 0;
         }
 
@@ -78,14 +81,19 @@ public sealed class DiffCommand(IMigrationCommandRunner runner) : MigrationComma
 
         if (!removeResult.Success)
         {
-            AnsiConsole.MarkupLine("[red]✖ Temporary migration was created but could not be removed.[/]");
+            ConsoleOutput.Error("Temporary migration was created but could not be removed.");
             CommandHelpers.PrintCommandOutput(removeResult.StandardOutput, removeResult.StandardError);
             return removeResult.ExitCode;
         }
 
+        if (verbose)
+        {
+            ConsoleOutput.Success("Temporary migration cleaned up.");
+        }
+
         if (operations.Count == 0)
         {
-            AnsiConsole.MarkupLine("[yellow]Changes detected, but no migration operations could be parsed.[/]");
+            ConsoleOutput.Warning("Changes detected, but no migration operations could be parsed.");
             return 0;
         }
 
@@ -96,7 +104,7 @@ public sealed class DiffCommand(IMigrationCommandRunner runner) : MigrationComma
 
     private static void PrintDiff(IReadOnlyList<MigrationOperationSummary> operations)
     {
-        AnsiConsole.MarkupLine("[yellow]Model changes detected:[/]");
+        ConsoleOutput.Warning("Model changes detected.");
         AnsiConsole.WriteLine();
 
         var table = new Table()

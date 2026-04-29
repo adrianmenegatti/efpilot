@@ -1,3 +1,4 @@
+using EfPilot.Cli.Output;
 using EfPilot.Core.Abstractions;
 using EfPilot.Core.Migrations;
 using Spectre.Console;
@@ -32,16 +33,13 @@ public sealed class UpdateCommand(IMigrationCommandRunner runner) : MigrationCom
             return 1;
         }
 
-        if (string.IsNullOrWhiteSpace(targetMigration))
-        {
-            AnsiConsole.MarkupLine(
-                $"Updating database using profile [blue]{profile.Name}[/]");
-        }
-        else
-        {
-            AnsiConsole.MarkupLine(
-                $"Updating database to migration [green]{targetMigration}[/] using profile [blue]{profile.Name}[/]");
-        }
+        ConsoleOutput.Header("EfPilot Update");
+        ConsoleOutput.ProfileSummary(profile);
+        AnsiConsole.WriteLine();
+
+        ConsoleOutput.Info(string.IsNullOrWhiteSpace(targetMigration)
+            ? "Updating database to latest migration..."
+            : $"Updating database to migration '{targetMigration}'...");
 
         var result = await Runner.UpdateDatabaseAsync(new UpdateDatabaseRequest
         {
@@ -57,7 +55,7 @@ public sealed class UpdateCommand(IMigrationCommandRunner runner) : MigrationCom
 
         if (!result.Success)
         {
-            AnsiConsole.MarkupLine($"[red]✖ Database update failed. Exit code: {result.ExitCode}[/]");
+            ConsoleOutput.Error($"Database update failed. Exit code: {result.ExitCode}");
 
             if (!verbose)
             {
@@ -67,7 +65,7 @@ public sealed class UpdateCommand(IMigrationCommandRunner runner) : MigrationCom
             return result.ExitCode;
         }
 
-        AnsiConsole.MarkupLine("[green]✔ Database updated successfully.[/]");
+        ConsoleOutput.Success("Database updated successfully.");
         return 0;
     }
 }
