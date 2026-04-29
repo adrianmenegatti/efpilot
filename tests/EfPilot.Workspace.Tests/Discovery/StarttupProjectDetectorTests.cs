@@ -81,6 +81,50 @@ public sealed class StartupProjectDetectorTests
 
         Assert.Contains(result, candidate => candidate.Project.Name == "RateRisk.Worker");
     }
+    
+    [Fact]
+    public void DetectCandidates_ShouldInferBoundedContextWithoutHardcodedNames()
+    {
+        using var temp = TestDirectory.Create();
+
+        var infrastructure = CreateProject(
+            temp.Path,
+            "apps/billing/infrastructure/Billing.Infrastructure",
+            "Billing.Infrastructure",
+            "Microsoft.NET.Sdk");
+
+        var api = CreateProject(
+            temp.Path,
+            "apps/billing/api/Billing.Api",
+            "Billing.Api",
+            "Microsoft.NET.Sdk.Web");
+
+        File.WriteAllText(Path.Combine(api.Directory, "Program.cs"), "");
+        File.WriteAllText(Path.Combine(api.Directory, "appsettings.json"), "{}");
+
+        var catalogApi = CreateProject(
+            temp.Path,
+            "apps/catalog/api/Catalog.Api",
+            "Catalog.Api",
+            "Microsoft.NET.Sdk.Web");
+
+        File.WriteAllText(Path.Combine(catalogApi.Directory, "Program.cs"), "");
+        File.WriteAllText(Path.Combine(catalogApi.Directory, "appsettings.json"), "{}");
+
+        var dbContext = new DiscoveredDbContext
+        {
+            Name = "BillingDbContext",
+            Project = infrastructure
+        };
+
+        var detector = new StartupProjectDetector();
+
+        var result = detector.DetectCandidates(dbContext, [infrastructure, api, catalogApi]);
+
+        Assert.NotEmpty(result);
+        Assert.Equal("Billing.Api", result[0].Project.Name);
+        Assert.DoesNotContain(result, candidate => candidate.Project.Name == "Catalog.Api");
+    }
 
     private static WorkspaceProject CreateProject(
         string root,
