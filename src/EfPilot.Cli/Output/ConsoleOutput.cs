@@ -63,4 +63,21 @@ internal static class ConsoleOutput
         ProfileSummary(profile);
         BlankLine();
     }
+    
+    public static void ProfileHeaderWithStats(
+        string profileName,
+        string dbContext,
+        int applied,
+        int pending)
+    {
+        var title =
+            $"{profileName} ({dbContext}) " +
+            $"[green]Applied: {applied}[/] | [yellow]Pending: {pending}[/]";
+
+        AnsiConsole.Write(
+            new Rule($"[bold]{Markup.Escape(profileName)}[/] " +
+                     $"[grey]({Markup.Escape(dbContext)})[/] " +
+                     $"[green]Applied: {applied}[/] | [yellow]Pending: {pending}[/]")
+                .RuleStyle("grey"));
+    }
 }

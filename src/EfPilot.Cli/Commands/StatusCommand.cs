@@ -80,13 +80,18 @@ public sealed class StatusCommand(IMigrationCommandRunner runner) : MigrationCom
             return 1;
         }
 
-        RenderProfileHeader(profile, all);
-
         var result = await Runner.GetStatusAsync(new MigrationStatusRequest
         {
             SolutionDirectory = solutionDirectory,
             Profile = profile
         });
+        
+        var migrations = ParseMigrations(result.StandardOutput);
+
+        var appliedCount = migrations.Count(m => !m.IsPending);
+        var pendingCount = migrations.Count(m => m.IsPending);
+
+        RenderProfileHeader(profile, all, appliedCount, pendingCount);
 
         if (verbose)
         {
@@ -105,46 +110,46 @@ public sealed class StatusCommand(IMigrationCommandRunner runner) : MigrationCom
             return result.ExitCode;
         }
 
-        PrintMigrationStatus(result.StandardOutput);
+        PrintMigrationStatus(migrations);
         ConsoleOutput.BlankLine();
 
         return 0;
     }
 
-    private static void RenderProfileHeader(EfPilotProfile profile, bool all)
+    private static void RenderProfileHeader(
+        EfPilotProfile profile,
+        bool all,
+        int applied,
+        int pending)
     {
         if (all)
         {
-            ConsoleOutput.Header($"{profile.Name} ({profile.DbContext})");
+            ConsoleOutput.ProfileHeaderWithStats(
+                profile.Name,
+                profile.DbContext,
+                applied,
+                pending);
+
             ConsoleOutput.ProfileSummary(profile);
             ConsoleOutput.BlankLine();
             return;
         }
 
         ConsoleOutput.CommandIntro("status", profile);
+
+        AnsiConsole.MarkupLine(
+            $"[green]{applied} applied[/] | [yellow]{pending} pending[/]");
+
+        ConsoleOutput.BlankLine();
     }
 
-    private static void PrintMigrationStatus(string standardOutput)
+    private static void PrintMigrationStatus(List<MigrationStatusLine> migrations)
     {
-        var migrations = standardOutput
-            .Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Where(IsMigrationLine)
-            .Select(ParseMigrationLine)
-            .ToList();
-
         if (migrations.Count == 0)
         {
             ConsoleOutput.Warning("No migrations found.");
             return;
         }
-
-        var appliedCount = migrations.Count(migration => !migration.IsPending);
-        var pendingCount = migrations.Count(migration => migration.IsPending);
-
-        AnsiConsole.MarkupLine(
-            $"Migrations: [green]{appliedCount} applied[/], [yellow]{pendingCount} pending[/]");
-
-        ConsoleOutput.BlankLine();
 
         var table = new Table()
             .Border(TableBorder.Rounded)
@@ -191,6 +196,15 @@ public sealed class StatusCommand(IMigrationCommandRunner runner) : MigrationCom
             .Trim();
 
         return new MigrationStatusLine(name, isPending);
+    }
+    
+    private static List<MigrationStatusLine> ParseMigrations(string standardOutput)
+    {
+        return standardOutput
+            .Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(IsMigrationLine)
+            .Select(ParseMigrationLine)
+            .ToList();
     }
 
     private sealed record MigrationStatusLine(string Name, bool IsPending);
