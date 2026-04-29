@@ -70,14 +70,19 @@ internal static class ConsoleOutput
         int applied,
         int pending)
     {
+        var hasPending = pending > 0;
+
+        var statusIcon = hasPending ? "⏳" : "✔";
+        var ruleColor = hasPending ? "yellow" : "green";
+
         var title =
-            $"{profileName} ({dbContext}) " +
-            $"[green]Applied: {applied}[/] | [yellow]Pending: {pending}[/]";
+            $"{statusIcon} [bold]{Markup.Escape(profileName)}[/] " +
+            $"[grey]({Markup.Escape(dbContext)})[/] " +
+            $"[green]✔ Applied: {applied}[/] | " +
+            $"[yellow]⏳ Pending: {pending}[/]";
 
         AnsiConsole.Write(
-            new Rule($"[bold]{Markup.Escape(profileName)}[/] " +
-                     $"[grey]({Markup.Escape(dbContext)})[/] " +
-                     $"[green]Applied: {applied}[/] | [yellow]Pending: {pending}[/]")
-                .RuleStyle("grey"));
+            new Rule(title)
+                .RuleStyle(ruleColor));
     }
 }

@@ -138,11 +138,10 @@ public sealed class StatusCommand(IMigrationCommandRunner runner) : MigrationCom
         ConsoleOutput.CommandIntro("status", profile);
 
         AnsiConsole.MarkupLine(
-            $"[green]{applied} applied[/] | [yellow]{pending} pending[/]");
+            $"[green]✔ Applied: {applied}[/] | [yellow]⏳ Pending: {pending}[/]");
 
         ConsoleOutput.BlankLine();
     }
-
     private static void PrintMigrationStatus(List<MigrationStatusLine> migrations)
     {
         if (migrations.Count == 0)
@@ -160,12 +159,11 @@ public sealed class StatusCommand(IMigrationCommandRunner runner) : MigrationCom
         {
             table.AddRow(
                 Markup.Escape(migration.Name),
-                migration.IsPending ? "[yellow]Pending[/]" : "[green]Applied[/]");
+                migration.IsPending ? "[yellow]⏳ Pending[/]" : "[green]✔ Applied[/]");
         }
 
         AnsiConsole.Write(table);
     }
-
     private static bool IsMigrationLine(string line)
     {
         if (string.IsNullOrWhiteSpace(line))
