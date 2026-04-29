@@ -42,9 +42,7 @@ public sealed class AddCommand(IMigrationCommandRunner runner) : MigrationComman
             return 1;
         }
 
-        ConsoleOutput.Header("EfPilot Add");
-        ConsoleOutput.ProfileSummary(profile);
-        AnsiConsole.WriteLine();
+        ConsoleOutput.CommandIntro("add", profile);
         ConsoleOutput.Info($"Adding migration '{migrationName}'...");
 
         var result = await Runner.AddMigrationAsync(new AddMigrationRequest

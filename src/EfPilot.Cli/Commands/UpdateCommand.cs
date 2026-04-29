@@ -33,9 +33,7 @@ public sealed class UpdateCommand(IMigrationCommandRunner runner) : MigrationCom
             return 1;
         }
 
-        ConsoleOutput.Header("EfPilot Update");
-        ConsoleOutput.ProfileSummary(profile);
-        AnsiConsole.WriteLine();
+        ConsoleOutput.CommandIntro("update", profile);
 
         ConsoleOutput.Info(string.IsNullOrWhiteSpace(targetMigration)
             ? "Updating database to latest migration..."

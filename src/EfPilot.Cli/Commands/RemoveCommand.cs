@@ -33,9 +33,7 @@ public sealed class RemoveCommand(IMigrationCommandRunner runner) : MigrationCom
             return 1;
         }
 
-        ConsoleOutput.Header("EfPilot Remove");
-        ConsoleOutput.ProfileSummary(profile);
-        AnsiConsole.WriteLine();
+        ConsoleOutput.CommandIntro("remove", profile);
         ConsoleOutput.Info("Removing last migration...");
         
         if (force)

@@ -10,6 +10,11 @@ internal static class ConsoleOutput
         AnsiConsole.Write(new Rule($"[bold blue]{Markup.Escape(title)}[/]").RuleStyle("grey"));
     }
 
+    public static void CommandHeader(string commandName)
+    {
+        Header($"efpilot {commandName}");
+    }
+
     public static void Success(string message)
     {
         AnsiConsole.MarkupLine($"[green]✔ {Markup.Escape(message)}[/]");
@@ -30,6 +35,11 @@ internal static class ConsoleOutput
         AnsiConsole.MarkupLine($"[blue]ℹ {Markup.Escape(message)}[/]");
     }
 
+    public static void BlankLine()
+    {
+        AnsiConsole.WriteLine();
+    }
+
     public static void ProfileSummary(EfPilotProfile profile)
     {
         AnsiConsole.MarkupLine($"Profile: [blue]{Markup.Escape(profile.Name)}[/]");
@@ -41,5 +51,16 @@ internal static class ConsoleOutput
         {
             AnsiConsole.MarkupLine($"Migrations folder: [grey]{Markup.Escape(profile.MigrationsFolder)}[/]");
         }
+        else
+        {
+            AnsiConsole.MarkupLine("Migrations folder: [grey](EF default)[/]");
+        }
+    }
+
+    public static void CommandIntro(string commandName, EfPilotProfile profile)
+    {
+        CommandHeader(commandName);
+        ProfileSummary(profile);
+        BlankLine();
     }
 }

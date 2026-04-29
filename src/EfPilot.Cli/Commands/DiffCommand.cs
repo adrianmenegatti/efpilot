@@ -34,9 +34,7 @@ public sealed class DiffCommand(IMigrationCommandRunner runner) : MigrationComma
 
         var tempMigrationName = $"__EfPilotDiff_{DateTime.UtcNow:yyyyMMddHHmmss}";
 
-        ConsoleOutput.Header("EfPilot Diff");
-        ConsoleOutput.ProfileSummary(profile);
-        AnsiConsole.WriteLine();
+        ConsoleOutput.CommandIntro("diff", profile);
         ConsoleOutput.Info("Checking model changes...");
 
         var addResult = await Runner.AddMigrationAsync(new AddMigrationRequest
