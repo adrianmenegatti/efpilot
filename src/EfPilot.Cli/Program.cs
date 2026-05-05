@@ -39,11 +39,11 @@ static int ShowHelp()
 
     AnsiConsole.MarkupLine("Usage:");
     AnsiConsole.MarkupLine("  [green]efpilot init[/]");
-    AnsiConsole.MarkupLine("  [green]efpilot add <MigrationName> --profile <ProfileName> [--verbose][/]");
-    AnsiConsole.MarkupLine("  [green]efpilot remove --profile <ProfileName> [--force] [--verbose][/]");
-    AnsiConsole.MarkupLine("  [green]efpilot update --profile <ProfileName> [--to <Migration>] [--verbose][/]");
-    AnsiConsole.MarkupLine("  [green]efpilot status --profile <ProfileName> [--verbose][/]");
-    AnsiConsole.MarkupLine("  [green]efpilot diff --profile <ProfileName> [--verbose][/]");
+    AnsiConsole.MarkupLine("  [green]efpilot add <MigrationName> --profile <ProfileName> [[--verbose]][/]");
+    AnsiConsole.MarkupLine("  [green]efpilot remove --profile <ProfileName> [[--force]] [[--verbose]][/]");
+    AnsiConsole.MarkupLine("  [green]efpilot update --profile <ProfileName> [[--to <Migration>]] [[--verbose]][/]");
+    AnsiConsole.MarkupLine("  [green]efpilot status --profile <ProfileName> [[--verbose]][/]");
+    AnsiConsole.MarkupLine("  [green]efpilot diff --profile <ProfileName> [[--verbose]][/]");
 
     return 0;
 }
