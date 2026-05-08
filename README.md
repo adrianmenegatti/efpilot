@@ -37,7 +37,7 @@ EfPilot helps you **detect DbContexts, infer startup projects, avoid empty migra
 ## 📦 Installation
 
 ```bash
-git clone https://github.com/yourusername/efpilot.git
+git clone https://github.com/adrianmenegatti/efpilot.git
 cd efpilot
 dotnet build
 ```
