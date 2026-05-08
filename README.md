@@ -1,9 +1,8 @@
 # EfPilot 🚀
 
-![License](https://shields.io)
-![.NET Version](https://shields.io)
-![GitHub stars](https://shields.io)
-![GitHub issues](https://shields.io)
+[![License](https://shields.io)](https://github.com)
+[![.NET Version](https://shields.io)](https://microsoft.com)
+[![Stars](https://shields.io)](https://github.com)
 
 ![EfPilot Status Screenshot](https://github.com/adrianmenegatti/efpilot/blob/main/assets/efpilot.png?raw=true)
 
