@@ -180,6 +180,12 @@ EfPilot solves all of this with a simple CLI.
 
 ---
 
+## 📖 Background & Deep Dive
+If you want to know the "why" and "how" behind EfPilot, I wrote a detailed technical breakdown on DEV Community:
+👉 [How I Built a Smarter EF Core Migration CLI for Multi-Project Solutions](https://dev.to/amenegatti/how-i-built-a-smarter-ef-core-migration-cli-for-multi-project-solutions-4k1f)
+
+---
+
 ## 📌 Roadmap & AI Integration
 We are actively developing EfPilot to become the standard companion for EF Core. Upcoming milestones:
 - **Smart Diff Engine:** Using AI to explain complex migration changes in plain English.
