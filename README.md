@@ -1,8 +1,8 @@
 # EfPilot 🚀
 
-[![License](https://shields.io)](https://github.com)
-[![.NET Version](https://shields.io)](https://microsoft.com)
-[![Stars](https://shields.io)](https://github.com)
+![License](https://img.shields.io/badge/license-MIT-green)
+![.NET](https://img.shields.io/badge/.NET-10.0-blueviolet)
+![Stars](https://img.shields.io/github/stars/adrianmenegatti/efpilot?style=social)
 
 ![EfPilot Status Screenshot](https://github.com/adrianmenegatti/efpilot/blob/main/assets/efpilot.png?raw=true)
 
@@ -180,13 +180,12 @@ EfPilot solves all of this with a simple CLI.
 
 ---
 
-## 📌 Roadmap
-
-* [ ] Better diff engine
-* [ ] Migration history visualization
-* [ ] Interactive mode
-* [ ] NuGet global tool
-
+## 📌 Roadmap & AI Integration
+We are actively developing EfPilot to become the standard companion for EF Core. Upcoming milestones:
+- **Smart Diff Engine:** Using AI to explain complex migration changes in plain English.
+- **Migration History Visualization:** Interactive timelines of your database schema evolution.
+- **NuGet Global Tool:** Easy installation via `dotnet tool install -g EfPilot`.
+- **Interactive Mode:** A guided wizard for resolving migration conflicts.
 ---
 
 ## 🤝 Contributing
