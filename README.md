@@ -1,5 +1,12 @@
 # EfPilot 🚀
 
+![License](https://shields.io)
+![.NET Version](https://shields.io)
+![GitHub stars](https://shields.io)
+![GitHub issues](https://shields.io)
+
+![EfPilot Status Screenshot](https://github.com/adrianmenegatti/efpilot/blob/main/assets/efpilot.png?raw=true)
+
 A smarter CLI for managing Entity Framework Core migrations.
 
 EfPilot helps you **detect DbContexts, infer startup projects, avoid empty migrations, preview changes, and inspect migration status** — all with a clean, developer-friendly experience.
