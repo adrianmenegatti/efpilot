@@ -187,11 +187,18 @@ If you want to know the "why" and "how" behind EfPilot, I wrote a detailed techn
 ---
 
 ## 📌 Roadmap & AI Integration
-We are actively developing EfPilot to become the standard companion for EF Core. Upcoming milestones:
+Based on the feedback received from the community we are actively developing EfPilot to become the standard companion for EF Core. Upcoming milestones:
 - **Smart Diff Engine:** Using AI to explain complex migration changes in plain English.
 - **Migration History Visualization:** Interactive timelines of your database schema evolution.
 - **NuGet Global Tool:** Easy installation via `dotnet tool install -g EfPilot`.
 - **Interactive Mode:** A guided wizard for resolving migration conflicts.
+---
+
+## 💬 Community Feedback
+EfPilot has sparked great interest in the developer community:
+- **12,000+ views** on Reddit ([r/dotnet discussion](https://www.reddit.com/r/csharp/comments/1t4krn1/how_do_you_handle_ef_core_migrations_in/))
+- Featured on **Dev.to**
+
 ---
 
 ## 🤝 Contributing
