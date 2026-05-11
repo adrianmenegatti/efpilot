@@ -2,13 +2,23 @@
 
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![.NET](https://img.shields.io/badge/.NET-10.0-blueviolet)
+![NuGet](https://img.shields.io/nuget/v/efpilot)
+![NuGet Downloads](https://img.shields.io/nuget/dt/efpilot)
 ![Stars](https://img.shields.io/github/stars/adrianmenegatti/efpilot?style=social)
 
 ![EfPilot Status Screenshot](https://github.com/adrianmenegatti/efpilot/blob/main/assets/efpilot.png?raw=true)
 
-A smarter CLI for managing Entity Framework Core migrations.
+Stop fighting `dotnet ef` in multi-project solutions.
 
 EfPilot helps you **detect DbContexts, infer startup projects, avoid empty migrations, preview changes, and inspect migration status** — all with a clean, developer-friendly experience.
+
+---
+
+## 🎬 See EfPilot in Action
+
+Manage migrations across multiple projects without `dotnet ef` command gymnastics.
+
+![EfPilot Demo](assets/demo/efpilot-hero.gif)
 
 ---
 
@@ -42,10 +52,16 @@ EfPilot helps you **detect DbContexts, infer startup projects, avoid empty migra
 
 ## 📦 Installation
 
+Install EfPilot globally using the .NET tool system:
+
 ```bash
-git clone https://github.com/adrianmenegatti/efpilot.git
-cd efpilot
-dotnet build
+dotnet tool install -g efpilot
+```
+
+Verify the installation:
+
+```bash
+efpilot --version
 ```
 
 ---
@@ -55,7 +71,7 @@ dotnet build
 ### Initialize configuration
 
 ```bash
-dotnet run --project src/EfPilot.Cli -- init
+efpilot init
 ```
 
 EfPilot will:
@@ -70,10 +86,15 @@ EfPilot will:
 ### Check migration status
 
 ```bash
-dotnet run --project src/EfPilot.Cli -- status --all
+efpilot status --all
 ```
 
+![EfPilot Status Demo](assets/demo/efpilot-status.gif)
+
 Example output:
+
+<details>
+<summary>View sample output</summary>
 
 ```
 ──────────── MyProfile ── ✔ Applied: 5 | ⏳ Pending: 2 ────────────
@@ -92,13 +113,13 @@ DbContext: MyDbContext
 │ 20260430120000_AddNewField                    │ ⏳ Pending │
 └───────────────────────────────────────────────┴────────────┘
 ```
-
+</details>
 ---
 
 ### Add a migration
 
 ```bash
-dotnet run --project src/EfPilot.Cli -- add --profile MyProfile --name AddNewField
+efpilot add --profile MyProfile --name AddNewField
 ```
 
 * Automatically uses correct startup project
@@ -109,7 +130,7 @@ dotnet run --project src/EfPilot.Cli -- add --profile MyProfile --name AddNewFie
 ### Remove last migration
 
 ```bash
-dotnet run --project src/EfPilot.Cli -- remove --profile MyProfile
+efpilot remove --profile MyProfile
 ```
 
 ---
@@ -117,7 +138,7 @@ dotnet run --project src/EfPilot.Cli -- remove --profile MyProfile
 ### Update database
 
 ```bash
-dotnet run --project src/EfPilot.Cli -- update --profile MyProfile
+efpilot update --profile MyProfile
 ```
 
 ---
@@ -125,8 +146,9 @@ dotnet run --project src/EfPilot.Cli -- update --profile MyProfile
 ### Preview changes (diff)
 
 ```bash
-dotnet run --project src/EfPilot.Cli -- diff --profile MyProfile
+efpilot diff --profile MyProfile
 ```
+![EfPilot Diff Demo](assets/demo/efpilot-diff.gif)
 
 Example:
 
@@ -150,7 +172,7 @@ EfPilot generates a config file:
       "name": "MyProfile",
       "dbContext": "MyDbContext",
       "project": "apps/MyApp/infrastructure/MyApp.Infrastructure.csproj",
-      "startupProject": "apps/mayapp/api/MyApp.Api.csproj",
+      "startupProject": "apps/myapp/api/MyApp.Api.csproj",
       "migrationsFolder": null
     }
   ]
@@ -186,19 +208,18 @@ If you want to know the "why" and "how" behind EfPilot, I wrote a detailed techn
 
 ---
 
-## 📌 Roadmap & AI Integration
-Based on the feedback received from the community we are actively developing EfPilot to become the standard companion for EF Core. Upcoming milestones:
-- **Smart Diff Engine:** Using AI to explain complex migration changes in plain English.
-- **Migration History Visualization:** Interactive timelines of your database schema evolution.
-- **NuGet Global Tool:** Easy installation via `dotnet tool install -g EfPilot`.
-- **Interactive Mode:** A guided wizard for resolving migration conflicts.
----
-
 ## 💬 Community Feedback
 EfPilot has sparked great interest in the developer community:
-- **12,000+ views** on Reddit ([r/dotnet discussion](https://www.reddit.com/r/csharp/comments/1t4krn1/how_do_you_handle_ef_core_migrations_in/))
+- **13,000+ views** on Reddit ([r/dotnet discussion](https://www.reddit.com/r/csharp/comments/1t4krn1/how_do_you_handle_ef_core_migrations_in/))
 - Featured on **Dev.to**
 
+---
+
+## 📌 Roadmap & AI Integration
+Based on community feedback, here’s what we’re building next:
+- **Smart Diff Engine:** Using AI to explain complex migration changes in plain English.
+- **Migration History Visualization:** Interactive timelines of your database schema evolution.
+- **Interactive Mode:** A guided wizard for resolving migration conflicts.
 ---
 
 ## 🤝 Contributing

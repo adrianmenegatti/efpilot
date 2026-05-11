@@ -17,6 +17,20 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <Version>0.0.1</Version>
+
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>efpilot</ToolCommandName>
+    <PackageOutputPath>./nupkg</PackageOutputPath>
+    <PackageId>EfPilot</PackageId>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <Authors>Adrian Menegatti</Authors>
+    <Description>A smarter CLI for managing Entity Framework Core migrations.</Description>
+    <PackageProjectUrl>https://github.com/adrianmenegatti/efpilot</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/adrianmenegatti/efpilot</RepositoryUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>efcore;entity-framework;migrations;cli;dotnet-tool</PackageTags>
   </PropertyGroup>
 
 </Project>
