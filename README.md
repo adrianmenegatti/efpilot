@@ -210,7 +210,7 @@ If you want to know the "why" and "how" behind EfPilot, I wrote a detailed techn
 
 ## 💬 Community Feedback
 EfPilot has sparked great interest in the developer community:
-- **13,000+ views** on Reddit ([r/dotnet discussion](https://www.reddit.com/r/csharp/comments/1t4krn1/how_do_you_handle_ef_core_migrations_in/))
+- **14,000+ views** on Reddit ([r/dotnet discussion](https://www.reddit.com/r/csharp/comments/1t4krn1/how_do_you_handle_ef_core_migrations_in/))
 - Featured on **Dev.to**
 
 ---
