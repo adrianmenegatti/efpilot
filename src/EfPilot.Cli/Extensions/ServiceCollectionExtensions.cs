@@ -5,6 +5,7 @@ using EfPilot.Core.Abstractions;
 using EfPilot.Core.Migrations;
 using EfPilot.EfCore.Execution;
 using EfPilot.Workspace.Configuration;
+using EfPilot.Workspace.Diagnostics;
 using EfPilot.Workspace.Discovery;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -18,6 +19,10 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ProjectScanner>();
         services.AddSingleton<DbContextScanner>();
         services.AddSingleton<StartupProjectDetector>();
+        services.AddSingleton<DesignTimeFactoryAnalyzer>();
+        services.AddSingleton<StartupAnalyzer>();
+        services.AddSingleton<MigrationAnalyzer>();
+        services.AddSingleton<DiagnosticsRunner>();
         services.AddSingleton<EfPilotConfigStore>();
         services.AddSingleton<CommandContextLoader>();
         services.AddSingleton<EfPilotCommandDispatcher>();
@@ -56,6 +61,11 @@ public static class ServiceCollectionExtensions
             "diff",
             "Preview model changes",
             "efpilot diff --profile RateRiskDbContext [--verbose]");
+
+        services.AddEfPilotCommand<DiagnosticsCommand>(
+            "diagnostics",
+            "Analyze EF Core migration workflow health",
+            "efpilot diagnostics [--profile RateRiskDbContext] [--verbose]");
 
         return services;
     }

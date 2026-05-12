@@ -215,12 +215,17 @@ public sealed class DotNetEfMigrationCommandRunner(MigrationFileAnalyzer migrati
             "migrations",
             "list",
             "--project",
-            ToFullPath(request.SolutionDirectory, profile.Project),
-            "--startup-project",
-            ToFullPath(request.SolutionDirectory, profile.StartupProject),
-            "--context",
-            profile.DbContext
+            ToFullPath(request.SolutionDirectory, profile.Project)
         };
+
+        if (request.UseStartupProject)
+        {
+            arguments.Add("--startup-project");
+            arguments.Add(ToFullPath(request.SolutionDirectory, profile.StartupProject));
+        }
+
+        arguments.Add("--context");
+        arguments.Add(profile.DbContext);
 
         return await RunDotNetAsync(
             request.SolutionDirectory,

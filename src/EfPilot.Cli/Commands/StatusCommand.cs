@@ -2,7 +2,10 @@ using EfPilot.Cli.Output;
 using EfPilot.Cli.Profiles;
 using EfPilot.Core.Abstractions;
 using EfPilot.Core.Configuration;
+using EfPilot.Core.Diagnostics;
 using EfPilot.Core.Migrations;
+using EfPilot.Workspace.Diagnostics;
+using EfPilot.Workspace.Discovery;
 using Spectre.Console;
 
 namespace EfPilot.Cli.Commands;
@@ -11,7 +14,9 @@ public sealed class StatusCommand(
     IMigrationCommandRunner runner,
     CommandContextLoader contextLoader,
     ProfileResolver profileResolver,
-    ProfileValidator profileValidator) : MigrationCommand(runner)
+    ProfileValidator profileValidator,
+    ProjectScanner projectScanner,
+    DesignTimeFactoryAnalyzer designTimeFactoryAnalyzer) : MigrationCommand(runner)
 {
     public override async Task<int> ExecuteAsync(string[] args)
     {
@@ -36,13 +41,21 @@ public sealed class StatusCommand(
             return 1;
         }
 
+        var designTimeFactories = DiscoverDesignTimeFactories(context.SolutionDirectory);
+
         foreach (var profile in selectedProfiles)
         {
+            var designTimeFactoryPreference = GetDesignTimeFactoryPreference(
+                context.SolutionDirectory,
+                profile,
+                designTimeFactories);
+
             var exitCode = await RenderProfileStatusAsync(
                 context.SolutionDirectory,
                 profile,
                 verbose,
-                all);
+                all,
+                designTimeFactoryPreference);
 
             if (exitCode != 0)
             {
@@ -78,7 +91,8 @@ public sealed class StatusCommand(
         string solutionDirectory,
         EfPilotProfile profile,
         bool verbose,
-        bool all)
+        bool all,
+        DesignTimeFactoryPreference designTimeFactoryPreference)
     {
         var validation = profileValidator.ValidatePaths(solutionDirectory, profile);
 
@@ -88,11 +102,12 @@ public sealed class StatusCommand(
             return 1;
         }
 
-        var result = await Runner.GetStatusAsync(new MigrationStatusRequest
-        {
-            SolutionDirectory = solutionDirectory,
-            Profile = profile
-        });
+        var statusExecution = await GetStatusWithFactoryFallbackAsync(
+            solutionDirectory,
+            profile,
+            designTimeFactoryPreference);
+
+        var result = statusExecution.Result;
         
         var migrations = ParseMigrations(result.StandardOutput);
 
@@ -103,6 +118,7 @@ public sealed class StatusCommand(
 
         if (verbose)
         {
+            PrintStatusExecutionNotes(statusExecution);
             CommandHelpers.PrintCommandOutput(result.StandardOutput, result.StandardError);
         }
 
@@ -122,6 +138,134 @@ public sealed class StatusCommand(
         ConsoleOutput.BlankLine();
 
         return 0;
+    }
+
+    private async Task<StatusExecution> GetStatusWithFactoryFallbackAsync(
+        string solutionDirectory,
+        EfPilotProfile profile,
+        DesignTimeFactoryPreference designTimeFactoryPreference)
+    {
+        if (!designTimeFactoryPreference.CanTryWithoutStartupProject)
+        {
+            return new StatusExecution(
+                await GetStatusAsync(solutionDirectory, profile, useStartupProject: true),
+                TriedWithoutStartupProject: false,
+                UsedStartupProjectFallback: false,
+                SkippedReason: designTimeFactoryPreference.SkipReason,
+                FailedDesignTimeResult: null);
+        }
+
+        var designTimeResult = await GetStatusAsync(
+            solutionDirectory,
+            profile,
+            useStartupProject: false);
+
+        if (designTimeResult.Success)
+        {
+            return new StatusExecution(
+                designTimeResult,
+                TriedWithoutStartupProject: true,
+                UsedStartupProjectFallback: false,
+                SkippedReason: null,
+                FailedDesignTimeResult: null);
+        }
+
+        return new StatusExecution(
+            await GetStatusAsync(solutionDirectory, profile, useStartupProject: true),
+            TriedWithoutStartupProject: true,
+            UsedStartupProjectFallback: true,
+            SkippedReason: null,
+            FailedDesignTimeResult: designTimeResult);
+    }
+
+    private static void PrintStatusExecutionNotes(StatusExecution execution)
+    {
+        if (!execution.TriedWithoutStartupProject)
+        {
+            if (!string.IsNullOrWhiteSpace(execution.SkippedReason))
+            {
+                ConsoleOutput.Info(execution.SkippedReason);
+            }
+
+            return;
+        }
+
+        if (execution.UsedStartupProjectFallback)
+        {
+            ConsoleOutput.Warning("Design-time factory path failed. Used configured startup project fallback.");
+
+            if (execution.FailedDesignTimeResult is not null)
+            {
+                CommandHelpers.PrintCommandOutput(
+                    execution.FailedDesignTimeResult.StandardOutput,
+                    execution.FailedDesignTimeResult.StandardError);
+            }
+
+            return;
+        }
+
+        ConsoleOutput.Success("Design-time factory path used. Startup project was not required.");
+    }
+
+    private async Task<MigrationCommandResult> GetStatusAsync(
+        string solutionDirectory,
+        EfPilotProfile profile,
+        bool useStartupProject)
+    {
+        return await Runner.GetStatusAsync(new MigrationStatusRequest
+        {
+            SolutionDirectory = solutionDirectory,
+            Profile = profile,
+            UseStartupProject = useStartupProject
+        });
+    }
+
+    private IReadOnlyList<DesignTimeFactoryInfo> DiscoverDesignTimeFactories(
+        string solutionDirectory)
+    {
+        var projects = projectScanner.ScanProjects(solutionDirectory);
+
+        return designTimeFactoryAnalyzer.Analyze(projects);
+    }
+
+    private static DesignTimeFactoryPreference GetDesignTimeFactoryPreference(
+        string solutionDirectory,
+        EfPilotProfile profile,
+        IReadOnlyList<DesignTimeFactoryInfo> designTimeFactories)
+    {
+        var profileProjectPath = ToFullPath(solutionDirectory, profile.Project);
+
+        var factory = designTimeFactories.FirstOrDefault(factory =>
+            string.Equals(factory.DbContextName, profile.DbContext, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(
+                Path.GetFullPath(factory.Project.Path),
+                profileProjectPath,
+                StringComparison.OrdinalIgnoreCase));
+
+        if (factory is null)
+        {
+            return new DesignTimeFactoryPreference(
+                CanTryWithoutStartupProject: false,
+                SkipReason: null);
+        }
+
+        if (factory.ReadsConfigurationFromCurrentDirectory)
+        {
+            return new DesignTimeFactoryPreference(
+                CanTryWithoutStartupProject: false,
+                SkipReason: "Design-time factory reads appsettings from the current directory. Using configured startup project.");
+        }
+
+        return new DesignTimeFactoryPreference(
+            CanTryWithoutStartupProject: true,
+            SkipReason: null);
+    }
+
+    private static string ToFullPath(string solutionDirectory, string path)
+    {
+        return Path.IsPathRooted(path)
+            ? Path.GetFullPath(path)
+            : Path.GetFullPath(Path.Combine(solutionDirectory, path));
     }
 
     private static void RenderProfileHeader(
@@ -214,4 +358,15 @@ public sealed class StatusCommand(
     }
 
     private sealed record MigrationStatusLine(string Name, bool IsPending);
+
+    private sealed record StatusExecution(
+        MigrationCommandResult Result,
+        bool TriedWithoutStartupProject,
+        bool UsedStartupProjectFallback,
+        string? SkippedReason,
+        MigrationCommandResult? FailedDesignTimeResult);
+
+    private sealed record DesignTimeFactoryPreference(
+        bool CanTryWithoutStartupProject,
+        string? SkipReason);
 }

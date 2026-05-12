@@ -44,8 +44,10 @@ internal static class ConsoleOutput
     {
         AnsiConsole.MarkupLine($"Profile: [blue]{Markup.Escape(profile.Name)}[/]");
         AnsiConsole.MarkupLine($"DbContext: [green]{Markup.Escape(profile.DbContext)}[/]");
-        AnsiConsole.MarkupLine($"Project: [grey]{Markup.Escape(profile.Project)}[/]");
-        AnsiConsole.MarkupLine($"Startup: [grey]{Markup.Escape(profile.StartupProject)}[/]");
+        AnsiConsole.MarkupLine("Project:");
+        AnsiConsole.MarkupLine($"  [grey]{Markup.Escape(profile.Project)}[/]");
+        AnsiConsole.MarkupLine("Startup:");
+        AnsiConsole.MarkupLine($"  [grey]{Markup.Escape(profile.StartupProject)}[/]");
 
         if (!string.IsNullOrWhiteSpace(profile.MigrationsFolder))
         {
