@@ -6,6 +6,7 @@
     <Project Path="src/EfPilot.Workspace/EfPilot.Workspace.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/EfPilot.Cli.Tests/EfPilot.Cli.Tests.csproj" />
     <Project Path="tests/EfPilot.Core.Tests/EfPilot.Core.Tests.csproj" />
     <Project Path="tests/EfPilot.Workspace.Tests/EfPilot.Workspace.Tests.csproj" />
   </Folder>

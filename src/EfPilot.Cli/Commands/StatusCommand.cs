@@ -1,4 +1,5 @@
 using EfPilot.Cli.Output;
+using EfPilot.Cli.Profiles;
 using EfPilot.Core.Abstractions;
 using EfPilot.Core.Configuration;
 using EfPilot.Core.Migrations;
@@ -6,7 +7,11 @@ using Spectre.Console;
 
 namespace EfPilot.Cli.Commands;
 
-public sealed class StatusCommand(IMigrationCommandRunner runner, CommandContextLoader contextLoader) : MigrationCommand(runner)
+public sealed class StatusCommand(
+    IMigrationCommandRunner runner,
+    CommandContextLoader contextLoader,
+    ProfileResolver profileResolver,
+    ProfileValidator profileValidator) : MigrationCommand(runner)
 {
     public override async Task<int> ExecuteAsync(string[] args)
     {
@@ -48,7 +53,7 @@ public sealed class StatusCommand(IMigrationCommandRunner runner, CommandContext
         return 0;
     }
 
-    private static List<EfPilotProfile>? ResolveSelectedProfiles(
+    private List<EfPilotProfile>? ResolveSelectedProfiles(
         IReadOnlyList<EfPilotProfile> profiles,
         string? profileName,
         bool all)
@@ -58,11 +63,11 @@ public sealed class StatusCommand(IMigrationCommandRunner runner, CommandContext
             return profiles.ToList();
         }
 
-        var profile = CommandHelpers.ResolveProfile(profiles, profileName);
+        var profile = profileResolver.Resolve(profiles, profileName);
 
         if (profile is null)
         {
-            CommandHelpers.PrintProfileNotFound(profiles);
+            profileResolver.PrintProfileNotFound(profiles);
             return null;
         }
 
@@ -75,8 +80,11 @@ public sealed class StatusCommand(IMigrationCommandRunner runner, CommandContext
         bool verbose,
         bool all)
     {
-        if (!CommandHelpers.ValidateProfilePaths(solutionDirectory, profile))
+        var validation = profileValidator.ValidatePaths(solutionDirectory, profile);
+
+        if (!validation.IsValid)
         {
+            profileValidator.PrintErrors(validation);
             return 1;
         }
 

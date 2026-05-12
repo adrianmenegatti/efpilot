@@ -1,11 +1,16 @@
 using EfPilot.Cli.Output;
+using EfPilot.Cli.Profiles;
 using EfPilot.Core.Abstractions;
 using EfPilot.Core.Migrations;
 using Spectre.Console;
 
 namespace EfPilot.Cli.Commands;
 
-public sealed class RemoveCommand(IMigrationCommandRunner runner, CommandContextLoader contextLoader) : MigrationCommand(runner)
+public sealed class RemoveCommand(
+    IMigrationCommandRunner runner,
+    CommandContextLoader contextLoader,
+    ProfileResolver profileResolver,
+    ProfileValidator profileValidator) : MigrationCommand(runner)
 {
     public override async Task<int> ExecuteAsync(string[] args)
     {
@@ -20,16 +25,19 @@ public sealed class RemoveCommand(IMigrationCommandRunner runner, CommandContext
             return 1;
         }
 
-        var profile = CommandHelpers.ResolveProfile(context.Config.Profiles, profileName);
+        var profile = profileResolver.Resolve(context.Config.Profiles, profileName);
 
         if (profile is null)
         {
-            CommandHelpers.PrintProfileNotFound(context.Config.Profiles);
+            profileResolver.PrintProfileNotFound(context.Config.Profiles);
             return 1;
         }
 
-        if (!CommandHelpers.ValidateProfilePaths(context.SolutionDirectory, profile))
+        var validation = profileValidator.ValidatePaths(context.SolutionDirectory, profile);
+
+        if (!validation.IsValid)
         {
+            profileValidator.PrintErrors(validation);
             return 1;
         }
 

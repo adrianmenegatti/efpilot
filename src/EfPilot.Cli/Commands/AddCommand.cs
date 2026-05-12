@@ -1,11 +1,15 @@
 using EfPilot.Cli.Output;
-using EfPilot.Core.Abstractions;
+using EfPilot.Cli.Profiles;
+using EfPilot.Cli.Workflows;
 using EfPilot.Core.Migrations;
 using Spectre.Console;
 
 namespace EfPilot.Cli.Commands;
 
-public sealed class AddCommand(IMigrationCommandRunner runner, CommandContextLoader contextLoader) : MigrationCommand(runner)
+public sealed class AddCommand(
+    AddMigrationWorkflow workflow,
+    ProfileResolver profileResolver,
+    ProfileValidator profileValidator) : EfPilotCommand
 {
     public override async Task<int> ExecuteAsync(string[] args)
     {
@@ -15,43 +19,58 @@ public sealed class AddCommand(IMigrationCommandRunner runner, CommandContextLoa
         if (string.IsNullOrWhiteSpace(migrationName))
         {
             ConsoleOutput.Error("Migration name is required.");
-            AnsiConsole.MarkupLine("Usage: [green]efpilot add <MigrationName> --profile <ProfileName> [--verbose][/]");
+            AnsiConsole.MarkupLine("Usage: [green]efpilot add <MigrationName> --profile <ProfileName> [[--verbose]][/]");
             return 1;
         }
 
         var profileName = CommandHelpers.GetOptionValue(args, "--profile");
         var verbose = CommandHelpers.HasFlag(args, "--verbose");
 
-        var context = await contextLoader.LoadAsync();
+        var workflowResult = await workflow.ExecuteAsync(
+            new AddMigrationWorkflowRequest(
+                migrationName,
+                profileName,
+                profile =>
+                {
+                    ConsoleOutput.CommandIntro("add", profile);
+                    ConsoleOutput.Info($"Adding migration '{migrationName}'...");
+                }));
 
-        if (context is null)
+        return RenderResult(workflowResult, migrationName, verbose);
+    }
+
+    private int RenderResult(
+        AddMigrationWorkflowResult workflowResult,
+        string migrationName,
+        bool verbose)
+    {
+        switch (workflowResult.Status)
         {
-            return 1;
+            case AddMigrationWorkflowStatus.ContextUnavailable:
+                return 1;
+
+            case AddMigrationWorkflowStatus.ProfileNotFound:
+                profileResolver.PrintProfileNotFound(workflowResult.AvailableProfiles);
+                return 1;
+
+            case AddMigrationWorkflowStatus.InvalidProfile:
+                profileValidator.PrintErrors(workflowResult.ValidationResult!);
+                return 1;
+
+            case AddMigrationWorkflowStatus.Completed:
+                return RenderMigrationResult(workflowResult.MigrationResult!, migrationName, verbose);
+
+            default:
+                throw new InvalidOperationException(
+                    $"Unsupported add migration workflow status: {workflowResult.Status}.");
         }
+    }
 
-        var profile = CommandHelpers.ResolveProfile(context.Config.Profiles, profileName);
-
-        if (profile is null)
-        {
-            CommandHelpers.PrintProfileNotFound(context.Config.Profiles);
-            return 1;
-        }
-
-        if (!CommandHelpers.ValidateProfilePaths(context.SolutionDirectory, profile))
-        {
-            return 1;
-        }
-
-        ConsoleOutput.CommandIntro("add", profile);
-        ConsoleOutput.Info($"Adding migration '{migrationName}'...");
-
-        var result = await Runner.AddMigrationAsync(new AddMigrationRequest
-        {
-            SolutionDirectory = context.SolutionDirectory,
-            Profile = profile,
-            MigrationName = migrationName
-        });
-
+    private static int RenderMigrationResult(
+        MigrationCommandResult result,
+        string migrationName,
+        bool verbose)
+    {
         if (verbose)
         {
             CommandHelpers.PrintCommandOutput(result.StandardOutput, result.StandardError);
