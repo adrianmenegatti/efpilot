@@ -1,7 +1,7 @@
 # EfPilot 🚀
 
 ![License](https://img.shields.io/badge/license-MIT-green)
-![.NET](https://img.shields.io/badge/.NET-10.0-blueviolet)
+![.NET](https://img.shields.io/badge/.NET-8.0-blueviolet)
 ![NuGet](https://img.shields.io/nuget/v/efpilot)
 ![NuGet Downloads](https://img.shields.io/nuget/dt/efpilot?cacheSeconds=300)
 ![Stars](https://img.shields.io/github/stars/adrianmenegatti/efpilot?style=social)
@@ -10,7 +10,7 @@
 
 Stop fighting `dotnet ef` in multi-project solutions.
 
-EfPilot helps you **detect DbContexts, infer startup projects, avoid empty migrations, preview changes, and inspect migration status** — all with a clean, developer-friendly experience.
+EfPilot helps you **detect DbContexts, infer startup projects, diagnose migration workflow issues, avoid empty migrations, preview changes, and inspect migration status** — all with a clean, developer-friendly experience.
 
 ---
 
@@ -40,6 +40,14 @@ Manage migrations across multiple projects without `dotnet ef` command gymnastic
 
     * See what will change before applying migrations
 
+* 🩺 **Diagnostics**
+
+    * Analyze DbContexts, design-time factories, startup projects, snapshots, empty migrations, and risky startup migration patterns
+
+* ⚡ **Smarter design-time factory handling**
+
+    * Uses `IDesignTimeDbContextFactory<T>` without `--startup-project` when safe, with automatic fallback when needed
+
 * 📊 **Migration status**
 
     * Shows applied vs pending migrations in a clean table
@@ -57,6 +65,8 @@ Install EfPilot globally using the .NET tool system:
 ```bash
 dotnet tool install -g efpilot
 ```
+
+EfPilot requires .NET 8 or later.
 
 Verify the installation:
 
@@ -80,6 +90,38 @@ EfPilot will:
 * find DbContexts
 * infer startup projects
 * generate a config file
+
+---
+
+### Run diagnostics
+
+```bash
+efpilot diagnostics
+```
+
+![EfPilot Diagnostics Screenshot](assets/efpilot%20diagnostics.png)
+
+EfPilot analyzes your EF Core migration workflow and reports useful findings:
+
+* detected DbContexts
+* design-time factories
+* startup projects
+* model snapshots
+* empty migrations
+* `Database.Migrate()` usage at startup
+* design-time factories that depend on `Directory.GetCurrentDirectory()` and `appsettings.json`
+
+For a specific profile:
+
+```bash
+efpilot diagnostics --profile MyProfile
+```
+
+For more detail:
+
+```bash
+efpilot diagnostics --verbose
+```
 
 ---
 
@@ -119,7 +161,7 @@ DbContext: MyDbContext
 ### Add a migration
 
 ```bash
-efpilot add --profile MyProfile --name AddNewField
+efpilot add AddNewField --profile MyProfile
 ```
 
 * Automatically uses correct startup project
@@ -196,9 +238,17 @@ EfPilot solves all of this with a simple CLI.
 
 ## 🛠 Built with
 
-* .NET 10
+* .NET 8
 * Entity Framework Core
 * Spectre.Console
+
+---
+
+## 📝 Changelog
+
+EfPilot `0.1.0` adds diagnostics, smarter design-time factory handling, and .NET 8 support.
+
+See [CHANGELOG.md](./CHANGELOG.md) for full release notes.
 
 ---
 
