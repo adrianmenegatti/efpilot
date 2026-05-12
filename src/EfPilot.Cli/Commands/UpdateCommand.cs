@@ -5,7 +5,7 @@ using Spectre.Console;
 
 namespace EfPilot.Cli.Commands;
 
-public sealed class UpdateCommand(IMigrationCommandRunner runner) : MigrationCommand(runner)
+public sealed class UpdateCommand(IMigrationCommandRunner runner, CommandContextLoader contextLoader) : MigrationCommand(runner)
 {
     public override async Task<int> ExecuteAsync(string[] args)
     {
@@ -13,7 +13,7 @@ public sealed class UpdateCommand(IMigrationCommandRunner runner) : MigrationCom
         var verbose = CommandHelpers.HasFlag(args, "--verbose");
         var targetMigration = CommandHelpers.GetOptionValue(args, "--to");
 
-        var context = await CommandHelpers.LoadContextAsync();
+        var context = await contextLoader.LoadAsync();
 
         if (context is null)
         {

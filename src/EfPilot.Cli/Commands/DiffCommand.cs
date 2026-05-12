@@ -5,14 +5,14 @@ using Spectre.Console;
 
 namespace EfPilot.Cli.Commands;
 
-public sealed class DiffCommand(IMigrationCommandRunner runner) : MigrationCommand(runner)
+public sealed class DiffCommand(IMigrationCommandRunner runner, CommandContextLoader contextLoader) : MigrationCommand(runner)
 {
     public override async Task<int> ExecuteAsync(string[] args)
     {
         var profileName = CommandHelpers.GetOptionValue(args, "--profile");
         var verbose = CommandHelpers.HasFlag(args, "--verbose");
 
-        var context = await CommandHelpers.LoadContextAsync();
+        var context = await contextLoader.LoadAsync();
 
         if (context is null)
         {

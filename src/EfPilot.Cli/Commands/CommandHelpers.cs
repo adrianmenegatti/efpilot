@@ -1,40 +1,10 @@
 using EfPilot.Core.Configuration;
-using EfPilot.Workspace.Configuration;
-using EfPilot.Workspace.Discovery;
 using Spectre.Console;
 
 namespace EfPilot.Cli.Commands;
 
 internal static class CommandHelpers
 {
-    public static async Task<CommandContext?> LoadContextAsync()
-    {
-        var currentDirectory = Directory.GetCurrentDirectory();
-
-        var solutionFinder = new SolutionFinder();
-        var solutionPath = solutionFinder.FindSolutionFile(currentDirectory);
-
-        if (solutionPath is null)
-        {
-            AnsiConsole.MarkupLine("[red]No .sln or .slnx file found.[/]");
-            return null;
-        }
-
-        var solutionDirectory = Path.GetDirectoryName(solutionPath)!;
-
-        var store = new EfPilotConfigStore();
-        var config = await store.LoadAsync(solutionDirectory);
-
-        if (config is null)
-        {
-            AnsiConsole.MarkupLine("[red]efpilot is not initialized for this solution.[/]");
-            AnsiConsole.MarkupLine("Run [green]efpilot init[/] first.");
-            return null;
-        }
-
-        return new CommandContext(solutionDirectory, config);
-    }
-
     public static EfPilotProfile? ResolveProfile(
         IReadOnlyList<EfPilotProfile> profiles,
         string? profileName)

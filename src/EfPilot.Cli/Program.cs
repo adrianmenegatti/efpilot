@@ -1,22 +1,11 @@
 ﻿using System.Reflection;
 using EfPilot.Cli.Commands;
-using EfPilot.Core.Abstractions;
-using EfPilot.Core.Migrations;
-using EfPilot.EfCore.Execution;
+using EfPilot.Cli.Extensions;
 using Microsoft.Extensions.DependencyInjection;
 using Spectre.Console;
 
 var services = new ServiceCollection();
-
-services.AddSingleton<MigrationFileAnalyzer>();
-services.AddSingleton<IMigrationCommandRunner, DotNetEfMigrationCommandRunner>();
-
-services.AddTransient<InitCommand>();
-services.AddTransient<AddCommand>();
-services.AddTransient<RemoveCommand>();
-services.AddTransient<UpdateCommand>();
-services.AddTransient<StatusCommand>();
-services.AddTransient<DiffCommand>();
+services.AddEfPilotCli();
 
 var provider = services.BuildServiceProvider();
 

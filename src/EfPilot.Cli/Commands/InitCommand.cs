@@ -7,13 +7,17 @@ using Spectre.Console;
 
 namespace EfPilot.Cli.Commands;
 
-public sealed class InitCommand : EfPilotCommand
+public sealed class InitCommand(
+    SolutionFinder solutionFinder,
+    ProjectScanner projectScanner,
+    DbContextScanner dbContextScanner,
+    StartupProjectDetector startupProjectDetector,
+    EfPilotConfigStore configStore) : EfPilotCommand
 {
     public override async Task<int> ExecuteAsync(string[] args)
     {
         var currentDirectory = Directory.GetCurrentDirectory();
 
-        var solutionFinder = new SolutionFinder();
         var solutionPath = solutionFinder.FindSolutionFile(currentDirectory);
 
         if (solutionPath is null)
@@ -27,12 +31,10 @@ public sealed class InitCommand : EfPilotCommand
 
         AnsiConsole.MarkupLine($"Found solution: [green]{solutionFileName}[/]");
 
-        var projectScanner = new ProjectScanner();
         var projects = projectScanner.ScanProjects(solutionDirectory);
 
         AnsiConsole.MarkupLine($"Found projects: [green]{projects.Count}[/]");
 
-        var dbContextScanner = new DbContextScanner();
         var dbContexts = dbContextScanner.ScanDbContexts(projects);
 
         PrintDetectedDbContexts(dbContexts, projects);
@@ -50,10 +52,9 @@ public sealed class InitCommand : EfPilotCommand
             Profiles = profiles
         };
 
-        var store = new EfPilotConfigStore();
-        await store.SaveAsync(solutionDirectory, config);
+        await configStore.SaveAsync(solutionDirectory, config);
 
-        var configPath = store.GetConfigPath(solutionDirectory);
+        var configPath = configStore.GetConfigPath(solutionDirectory);
 
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[green]efpilot initialized successfully.[/]");
@@ -62,7 +63,7 @@ public sealed class InitCommand : EfPilotCommand
         return 0;
     }
 
-    private static void PrintDetectedDbContexts(
+    private void PrintDetectedDbContexts(
         IReadOnlyList<DiscoveredDbContext> dbContexts,
         IReadOnlyList<WorkspaceProject> projects)
     {
@@ -76,14 +77,12 @@ public sealed class InitCommand : EfPilotCommand
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[bold]Detected DbContexts:[/]");
 
-        var startupDetector = new StartupProjectDetector();
-
         foreach (var dbContext in dbContexts)
         {
             AnsiConsole.MarkupLine($"- [green]{dbContext.Name}[/]");
             AnsiConsole.MarkupLine($"  Project: [blue]{dbContext.Project.Path}[/]");
 
-            var candidates = startupDetector
+            var candidates = startupProjectDetector
                 .DetectCandidates(dbContext, projects)
                 .Take(3)
                 .ToList();
@@ -102,7 +101,7 @@ public sealed class InitCommand : EfPilotCommand
         }
     }
 
-    private static List<EfPilotProfile> BuildProfiles(
+    private List<EfPilotProfile> BuildProfiles(
         string solutionDirectory,
         IReadOnlyList<DiscoveredDbContext> dbContexts,
         IReadOnlyList<WorkspaceProject> projects)
@@ -123,11 +122,9 @@ public sealed class InitCommand : EfPilotCommand
             return profiles;
         }
 
-        var startupDetector = new StartupProjectDetector();
-
         foreach (var dbContext in dbContexts)
         {
-            var candidates = startupDetector
+            var candidates = startupProjectDetector
                 .DetectCandidates(dbContext, projects)
                 .ToList();
 
