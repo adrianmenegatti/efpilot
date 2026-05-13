@@ -3,7 +3,7 @@
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![.NET](https://img.shields.io/badge/.NET-8.0-blueviolet)
 ![NuGet](https://img.shields.io/nuget/v/efpilot)
-![NuGet Downloads](https://img.shields.io/nuget/dt/efpilot?cacheSeconds=300)
+![NuGet Downloads](https://badgen.net/nuget/dt/efpilot)
 ![Stars](https://img.shields.io/github/stars/adrianmenegatti/efpilot?style=social)
 
 ![EfPilot Status Screenshot](https://github.com/adrianmenegatti/efpilot/blob/main/assets/efpilot.png?raw=true)
