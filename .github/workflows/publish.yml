@@ -5,7 +5,7 @@ on:
     types: [published]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   deploy:
@@ -34,3 +34,9 @@ jobs:
 
     - name: Push to NuGet
       run: dotnet nuget push "./nupkg/*.nupkg" --api-key ${{ secrets.NUGET_API_KEY }} --source nuget.org
+
+    # Optional: Automatically updates the published GitHub release text with the generated notes
+    - name: Generate Release Notes in GitHub
+      uses: softprops/action-gh-release@v2
+      with:
+        generate_release_notes: true
